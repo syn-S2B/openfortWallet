@@ -7,7 +7,7 @@ through shared Tools and Workflows to the send Journey. Openfort provides the
 external wallet implementation; Onli’s digital-thing model remains distinct from
 blockchain records.
 
-[Start the demo](#run-locally) · [Read the implementation report](docs/ARCHITECTURE.md) · [Review the code audit](docs/ONLI_CONFORMANCE_REVIEW.md)
+[Live demo](https://onli-openfort-wallet.fly.dev/) · [Run locally](#run-locally) · [Read the implementation report](docs/ARCHITECTURE.md) · [Review the code audit](docs/ONLI_CONFORMANCE_REVIEW.md)
 
 ## What you can explore
 
@@ -17,7 +17,7 @@ blockchain records.
 - **Operation recovery:** preserve pending or uncertain effects instead of blindly sending again.
 - **Claude skill:** required Recipe input, Owner authentication and behavior-authorization requirements in [.claude/skills/onli-send-funds](.claude/skills/onli-send-funds/SKILL.md).
 
-**Verified locally:** 137 tests passed, plus architecture checks, lint, formatting,
+**Verified locally:** 138 tests passed, plus architecture checks, lint, formatting,
 TypeScript and production build. This is local contract evidence, not a live-provider
 certification. See [verification](docs/VERIFICATION.md).
 
@@ -40,11 +40,12 @@ It ignores inherited Species credentials and external environment files.
 
 The running site includes two connected Docs pages:
 
-1. [Concepts and the build guide](http://127.0.0.1:5175/Docs/index.html) — Onli, Tools, Workflows, Journeys, Recipes, Resources and provider integration.
-2. [The Openfort code walkthrough](http://127.0.0.1:5175/Docs/openfort-walkthrough.html) — actual source excerpts showing how the wallet is assembled.
+1. [Concepts and the build guide](https://onli-openfort-wallet.fly.dev/Docs/index.html) — Onli, Tools, Workflows, Journeys, Recipes, Resources and provider integration.
+2. [The Openfort code walkthrough](https://onli-openfort-wallet.fly.dev/Docs/openfort-walkthrough.html) — actual source excerpts showing how the wallet is assembled.
 
-These localhost links work after starting the app. Their source lives in
-[public/Docs](public/Docs); this repository does not imply a hosted production wallet.
+These guides are also available locally after starting the app. Their source lives
+in [public/Docs](public/Docs). The [Fly.io deployment](docs/FLY_DEPLOYMENT.md) is
+a credential-free public demo; real-wallet operations are disabled.
 
 ## How it fits together
 
