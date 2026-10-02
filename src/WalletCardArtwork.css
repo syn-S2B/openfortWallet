@@ -1,0 +1,85 @@
+/* Ivory face and quiet bronze relief, inspired by the physical OnliCash card. */
+.byond-wallet-component .onli-card-front {
+  color: #65513a;
+  border: 1px solid #fff4e1;
+  border-radius: 18px;
+  background: linear-gradient(125deg, #eee8de, #ded5c7);
+  box-shadow: inset 0 1px 1px #fffdf7, inset 0 -1px 2px #99836a66,
+    0 0 0 1px #bfa58880, 0 1px 8px #ffdaa13b, 0 14px 24px -15px #24180d99;
+}
+.byond-wallet-component .onli-card-front::before {
+  opacity: .22;
+  mix-blend-mode: multiply;
+}
+.byond-wallet-component .onli-card-artwork {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.byond-wallet-component .onli-card-front .card-header {
+  height: 48px;
+  padding: 0 26px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: .03em;
+}
+.byond-wallet-component .onli-card-front .card-header > .icon {
+  width: 15px;
+  height: 15px;
+}
+.byond-wallet-component .onli-card-details {
+  inset: 54px 26px 18px;
+  justify-content: flex-end;
+  gap: 12px;
+  pointer-events: none;
+}
+.byond-wallet-component .onli-card-identity {
+  display: grid;
+  gap: 5px;
+  align-self: flex-start;
+  margin-bottom: 5px;
+  font-size: 10px;
+  line-height: 1.4;
+}
+.byond-wallet-component .onli-card-status { font-weight: 500; }
+.byond-wallet-component .onli-card-address { font-variant-numeric: tabular-nums; }
+.byond-wallet-component .onli-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.byond-wallet-component .onli-card-wordmark {
+  font-size: 25px;
+  font-weight: 400;
+  letter-spacing: .015em;
+  text-shadow: 0 1px 0 #fff9ed;
+}
+.byond-wallet-component .onli-card-open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: #f6f0e580;
+  box-shadow: inset 0 0 0 1px #80644538, 0 1px 1px #fff9ef99;
+  color: #58442e;
+  font-size: 12px;
+  font-weight: 500;
+  pointer-events: auto;
+  transition: background-color 150ms ease-out, transform 100ms ease-out;
+}
+.byond-wallet-component .onli-card-open:hover { background: #fff8eb; }
+.byond-wallet-component .onli-card-open:active { transform: scale(.96); }
+.byond-wallet-component .onli-card-front button:focus-visible {
+  outline: 2px solid #685039;
+  outline-offset: -5px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .byond-wallet-component .onli-card-open { transition: none; }
+}

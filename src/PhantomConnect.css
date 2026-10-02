@@ -1,0 +1,37 @@
+.byond-wallet-component .ad-face { background:#211233; }
+.byond-wallet-component .ad-face::after { opacity:.15; }
+.byond-wallet-component .ad-photo { background:url('/phantom-ad.png') center 36% / cover no-repeat; filter:none; }
+.byond-wallet-component .ad-photo::after { background:linear-gradient(180deg,rgba(27,13,45,.12),transparent 34%,rgba(22,10,36,.18) 56%,rgba(20,9,34,.7)); mix-blend-mode:normal; }
+.byond-wallet-component .ad-face .card-header { color:#f5edff; background:linear-gradient(180deg,#24113890,transparent); }
+.byond-wallet-component .phantom-copy { width:100%; gap:5px; max-height:270px; overflow-y:auto; scrollbar-width:thin; }
+.byond-wallet-component .phantom-eyebrow { font-size:9px; font-weight:700; letter-spacing:.2em; color:#d6bdfb; }
+.byond-wallet-component .phantom-copy .ad-headline { font-size:25px; font-weight:550; }
+.byond-wallet-component .phantom-copy .ad-sub { color:#ddcee9; font-size:11px; }
+.byond-wallet-component .phantom-cta { margin-top:7px; background:#bfa0f4; border-color:#cfb5fb; color:#25133d; font-weight:650; min-height:37px; gap:12px; box-shadow:0 3px 12px #11072530; }
+.byond-wallet-component .phantom-cta:hover:enabled { background:#d0b7fc; }
+.byond-wallet-component .phantom-buy { display:inline-flex; align-items:center; gap:6px; margin-top:7px; color:#f5edff; font-size:10px; font-weight:650; letter-spacing:.035em; text-underline-offset:3px; }
+.byond-wallet-component .phantom-buy:hover { color:#d5b6ff; }
+.byond-wallet-component .phantom-buy .icon { width:13px; height:13px; }
+.byond-wallet-component .phantom-cta:disabled { opacity:.75; cursor:wait; }
+.byond-wallet-component .phantom-secondary { border:0; padding:5px 2px 0; color:#d8c8e9; background:transparent; font:inherit; font-size:9px; cursor:pointer; text-underline-offset:3px; }
+.byond-wallet-component .phantom-secondary:hover { text-decoration:underline; }
+.byond-wallet-component .phantom-message { margin:4px 0 0; max-width:330px; font-size:10px; line-height:1.35; color:#f5eaff; }
+.byond-wallet-component .phantom-message a { color:#d2b4ff; white-space:nowrap; text-underline-offset:2px; }
+.byond-wallet-component .phantom-address { padding:6px 10px; border:1px solid #b8a0d746; background:#170a285e; border-radius:6px; font-size:11px; color:#f5ecff; user-select:all; }
+.byond-wallet-component .phantom-detail { margin:0; color:#d8c8e9; font-size:10px; }
+.byond-wallet-component .portability-details { overflow-y:auto; scrollbar-width:thin; }
+.byond-wallet-component .portability-details > * { flex-shrink:0; }
+.byond-wallet-component .portability-details h2 { font-size:26px; letter-spacing:-.8px; }
+.byond-wallet-component .portability-details .primary-button { margin-top:14px; }
+.byond-wallet-component .import-instruction { margin-top:7px !important; font-size:10px; line-height:1.4; color:#e0dce7; }
+.byond-wallet-component .portability-details .export-key-note { margin-top:6px; font-size:9px; line-height:1.4; }
+.byond-wallet-component .phantom-setup { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:12px; padding:10px 12px; border:1px solid #c3a4ef44; border-radius:8px; background:#bfa0f411; font-size:11px; color:#e8deef; }
+.byond-wallet-component .phantom-setup a { display:inline-flex; align-items:center; gap:5px; color:#d5b6ff; font-weight:600; text-decoration:none; }
+.byond-wallet-component .phantom-setup a:hover { text-decoration:underline; text-underline-offset:3px; }
+.byond-wallet-component .phantom-setup .icon { width:13px; height:13px; }
+.byond-wallet-component .phantom-check { margin-top:9px; color:#c9c1d0; font-size:9px; }
+.byond-wallet-component .phantom-check summary { cursor:pointer; padding:2px 0; }
+.byond-wallet-component .phantom-connection { display:grid; justify-items:start; gap:6px; padding:8px 0 2px; }
+.byond-wallet-component .phantom-copy :is(button,a):focus-visible,.byond-wallet-component .portability-details :is(button,a,summary):focus-visible { outline:2px solid #eee3ff; outline-offset:3px; }
+.backup-open-button { display: block; margin: 6px auto; padding: 3px 0; border: 0; background: transparent; color: inherit; text-decoration: underline; text-underline-offset: 4px; font: inherit; font-size: 12px; cursor: pointer; }
+.backup-open-button:disabled { opacity: .45; cursor: default; }

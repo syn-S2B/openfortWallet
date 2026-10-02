@@ -1,0 +1,26 @@
+{
+  "id": "onli-send-funds",
+  "version": "1",
+  "deployment_environment": "resolve-approved-environment",
+  "app_symbol": "resolve-registered-appliance",
+  "journey_binding": "journey_send_transfer",
+  "provider_binding": {
+    "recipe": "wallet-provider/v1",
+    "capability": "recovered-wallet-session/v1",
+    "adapter": "openfort/v1"
+  },
+  "network_recipe": "wallet-network/v1",
+  "chain_id": 11155111,
+  "asset": "USDC",
+  "authentication_method": "basic",
+  "authorization_behavior": "resolve-configured-transfer-behavior",
+  "quote_timing_ref": "resolve-approved-policy",
+  "poll_timing_ref": "resolve-approved-policy",
+  "completion_contract": "transfer-inclusion/v1",
+  "operation_store_ref": "resolve-protected-durable-store",
+  "audit_store_ref": "resolve-protected-audit-store",
+  "onli_id_endpoint_ref": "resolve-onli-id-host",
+  "onli_cloud_endpoint_ref": "resolve-onli-cloud-host",
+  "app_key_secret_ref": "resolve-secret-reference",
+  "mtls_identity_ref": "resolve-certificate-and-key-reference"
+}

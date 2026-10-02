@@ -1,0 +1,9 @@
+.backup-dialog { max-width: 520px; }
+.backup-dialog h2 { margin: 8px 0 16px; }
+.backup-dialog p { line-height: 1.5; }
+.backup-file { display: grid; gap: 10px; margin: 24px 0 16px; font-size: 14px; }
+.backup-file input { max-width: 100%; padding: 12px 0; }
+.backup-address { font-family: monospace; overflow-wrap: anywhere; font-size: 13px; }
+.backup-key { width: 100%; min-height: 90px; resize: none; padding: 14px; border: 1px solid #9ca8a4; border-radius: 10px; background: #f2f5f3; color: #20332e; font-family: monospace; overflow-wrap: anywhere; }
+.backup-actions { display: flex; gap: 12px; align-items: center; }
+.backup-notice { font-size: 14px; }

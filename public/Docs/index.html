@@ -1,0 +1,110 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Onli concepts and wallet adapter engineering guide"><title>This is different from the ground up. · Onli Docs</title><link rel="stylesheet" href="docs.css"></head><body><header><a href="index.html">ONLI / DOCS</a><nav aria-label="Documentation"><a href="#thing">Concept</a><a href="#concepts">Concepts</a><a href="#adapter">Build an Adapter</a><a href="openfort-walkthrough.html">Openfort walkthrough</a><a href="/">Wallet demo</a><a href="https://github.com/syn-S2B/openfortWallet">GitHub</a></nav></header><main><p class="eyebrow">ONLI / CONCEPT TO IMPLEMENTATION</p>
+<h1 id="thing">This is different from the ground up.</h1>
+<p class="lead">Onli is not crypto. Think of Onli as an intelligent file — a digital <em>thing</em>.</p>
+<p>Crypto, by contrast, is a record on a public ledger: an entry in a blockchain that states who holds what. Control of that entry comes from a private key — the access credential, not the asset itself. Onli is not a ledger record stored in a chain of blocks. Onli is a thing, not a record.</p>
+<p>This distinction is more than a difference in concept — it is a fundamental shift in how the system works. Records and things behave very differently, so before you build a bridge between them, it’s essential to understand that Onli does not work the way records work.</p>
+<p id="oracle">Onli keeps a record of events that have occurred to a thing, called an Oracle. A blockchain ledger, by contrast, records an event; the activity of moving a record <em>is</em> the record. A transfer on a chain is just an entry saying the claim moved. The activity <em>is</em> the record — there is no separate thing it is a record of.</p>
+<p>Onli is different from the ground up. This is why our nomenclature is different.</p>
+<h2 id="intent">Onli.Ai Works Differently Too</h2>
+<p>This is also why you need to adopt these concepts when you write for Onli.Ai. You don’t let an AI generate behavior and hope it’s right. You build a Tool first — an atomic piece of code that does one bounded thing, under one explicit contract, proven before anything depends on it. You then compose proven Tools into Workflows — reusable responsibilities that select only what the current context requires — and compose Workflows into Journeys that own one caller-visible outcome. You classify from the outcome downward and build from the atomic layer upward, so a large product surface rests on a small, proven core.</p>
+<p>Because everything the AI can do already exists as a proven Journey, Workflow, and Tool, the AI’s only job is to decipher intent and call the right unit. It cannot hallucinate a capability that was never built, improvise a step that was never tested, or accidentally do something the user didn’t want — there is no path for that to happen. The user says they want to send funds; the AI recognizes the intent and calls <code>journey_send_funds</code>, which executes only steps that were built once, contract-tested, and reused everywhere above them. The intelligence is in the intent. The execution is in the proven architecture.</p>
+<h2 id="concepts">The concepts</h2>
+<p>Onli uses five concepts. Each has one clear job.</p>
+<ul>
+<li><strong>Journey:</strong> owns one outcome the user wants, such as sending funds. It coordinates the work and handles completion or recovery.</li>
+<li><strong>Workflow:</strong> owns a reusable part of that work. It selects the Tools and other Workflows the current situation needs.</li>
+<li><strong>Tool:</strong> performs one bounded operation under a clear, tested contract, such as checking a destination.</li>
+<li id="recipe"><strong>Recipe:</strong> defines the arrangement, conditions and settings for the work. Provider selection belongs here: the Recipe chooses the approved provider binding. It does not execute anything.</li>
+<li><strong>Resource:</strong> is what the work uses, changes or produces, such as a wallet, transfer request or receipt. Its identity says what it is; its content holds its data; its context describes the situation.</li>
+</ul>
+<p>Start with the outcome and break it into reusable work. Build and prove the Tools first, then compose the Workflows and Journey.</p>
+<h2 id="capability">Connecting a provider</h2>
+<p>A <strong>Capability</strong> is a Tool that offers a stable operation independent of the provider. It defines the inputs, permissions, results and evidence needed to call the work complete.</p>
+<p>An <strong>Adapter</strong> translates that contract into the provider’s API and translates the response back. Only the Capability calls its Adapter; the Workflow stays independent of the provider.</p>
+<pre>Journey → Workflow → Capability → Adapter → Provider</pre>
+<p>For a send, the Journey owns the outcome, Workflows prepare and execute it, and Tools check the request and evidence. The Recipe selects approved settings. The Resources hold the wallet, request and result.</p>
+<p><a href="openfort-walkthrough.html">See how we assembled the Openfort wallet, with actual code →</a></p><h2 id="adapter">What you need to build</h2>
+<p>Use sending funds as the first complete example. Build the small operations, compose them into reusable Workflows, then expose a Journey that owns the result. Reuse an existing unit when its contract fits.</p>
+<h3>The Tools</h3>
+<p>These are the responsibilities a send path needs. Most already exist in this client. A new wallet provider implements the provider-backed operations through its Adapter and reuses the shared checks.</p>
+<div class="table-wrap"><table><thead><tr><th>Tool responsibility</th><th>What it does</th><th>Implementation reference</th></tr></thead><tbody>
+<tr><td>Validate destination and amount</td><td>Check the address and turn the amount into exact asset units.</td><td><code>tool_validate_transfer.ts</code></td></tr>
+<tr><td>Verify wallet identity</td><td>Ensure the recovered account is the issued wallet.</td><td><code>tool_compare_wallet_identity.ts</code></td></tr>
+<tr><td>Read balances and estimate fees <em>(Capability)</em></td><td>Obtain current network observations through a provider.</td><td><code>tool_capability_chain.ts</code></td></tr>
+<tr><td>Verify the quote and confirmation</td><td>Check freshness and explicit approval of the exact transfer.</td><td><code>tool_validate_transfer.ts</code>, <code>tool_verify_transfer_confirmation.ts</code></td></tr>
+<tr><td>Create the operation</td><td>Give the intent a stable identity and preserve its bindings.</td><td><code>tool_create_transfer_operation.ts</code></td></tr>
+<tr><td>Recover the wallet session <em>(Capability)</em></td><td>Provide scoped access to the existing account and own provider teardown.</td><td><code>tool_capability_wallet_session.ts</code></td></tr>
+<tr><td>Submit the approved transfer <em>(Capability operation)</em></td><td>Send only the confirmed payload through the recovered session.</td><td>Scoped session <code>sendTransfer</code> method</td></tr>
+<tr><td>Observe the transfer <em>(Capability)</em></td><td>Read the original transaction and receipt.</td><td><code>tool_capability_observe_transfer.ts</code></td></tr>
+<tr><td>Verify transfer evidence</td><td>Match the observations to the exact original intent.</td><td><code>tool_verify_transfer_evidence.ts</code></td></tr>
+</tbody></table></div>
+<p>Tool files are under <code>src/tool/</code>; Capability files are under <code>src/capability/</code>. The table names responsibilities, not a requirement to put every responsibility in a separate new file. Complete contracts and test mappings are in <code>docs/tool-contracts.json</code>.</p>
+<h3>The Workflows</h3>
+<ul><li><code>workflow_prepare_transfer</code>: validate intent, read balances and estimate the exact transfer.</li><li><code>workflow_review_transfer</code>: check the selected destination and unresolved-operation guard, then reuse preparation.</li><li><code>workflow_recover_wallet_session</code>: obtain fresh access, recover and verify the wallet, perform a scoped action and clean up. Send and export reuse it.</li><li><code>workflow_execute_transfer</code>: verify confirmation, reuse wallet recovery, check current balances and submit.</li><li><code>workflow_reconcile_transfer</code>: observe the original operation, verify evidence and update its result.</li></ul>
+<p>Here is a complete small Workflow using the existing preparation Workflow. Types and signatures come from this repository; the caller supplies the selected wallet and transfer fields.</p>
+<pre><code>import { workflow_prepare_transfer } from &#x27;./workflow_prepare_transfer.ts&#x27;
+import type { Wallet } from &#x27;../contracts/species.ts&#x27;
+import type { Asset } from &#x27;../contracts/wallet.ts&#x27;
+
+export async function workflow_quote_transfer(input: {
+  wallet: Wallet
+  asset: Asset
+  recipient: string
+  amount: string
+}) {
+  return workflow_prepare_transfer(
+    input.wallet, input.asset, input.recipient, input.amount,
+  )
+}</code></pre><p>This example shows reuse rather than another implementation of validation, balance reads and fees. In the full application, use <code>workflow_review_transfer</code> so destination selection and continuity guards are also checked.</p>
+<h3>The Journey</h3><p><code>journey_send_funds</code> is the conceptual outcome. This client names its implementation <code>journey_send_transfer</code>. Review happens first; explicit confirmation continues that intent into the Journey. A returned hash is pending. Reconciliation supplies completion evidence later.</p><p>The following composition uses the actual client API. The application supplies the signed-in session, selected wallet, reviewed quote, owner/wallet-scoped storage key and context callbacks. <code>confirmation</code> is created only in the explicit user-confirmation handler.</p><pre><code>import { journey_send_transfer } from &#x27;../journey/journey_send_transfer.ts&#x27;
+import { workflow_execute_transfer } from &#x27;../workflow/workflow_execute_transfer.ts&#x27;
+import { createTransferConfirmation } from &#x27;../contracts/transfer-confirmation.ts&#x27;
+
+// Inside the user&#x27;s explicit Confirm handler:
+const confirmation = createTransferConfirmation(quote)
+const result = await journey_send_transfer({
+  session,
+  wallet,
+  quote,
+  confirmation,
+  key: operationStorageKey,
+  storage: localStorage,
+  isCurrent: () =&gt; currentSessionAndWalletStillMatch(),
+  send: workflow_execute_transfer,
+  changed: record =&gt; showOperation(record),
+})
+
+showOutcome(result)</code></pre><p>The Journey locks the operation, checks for an existing unresolved intent and persists the operation before broadcast. It never automatically repeats a broadcast after a lost response. Callers display <code>pending</code> or <code>indeterminate</code> honestly and continue observation of that same operation.</p>
+<h2 id="provider-work">What you write as the provider</h2>
+<p>Your main implementation is the <strong>Adapter</strong>. It translates the agreed Capability operation into your SDK or API and translates the result back. You also supply its versioned Recipe binding and contract tests. You reuse the existing Journey, Workflows and pure Tools wherever their contracts fit.</p>
+<ol><li><strong>Agree the contract.</strong> Define the wallet identity, required permission, supported operations, result states and completion evidence. State any unsupported custody, export or network behavior.</li><li><strong>Write the private Adapter.</strong> Initialize your provider, recover the exact issued account, perform the approved operation and clean up. Translate errors without exposing credentials or raw provider responses.</li><li><strong>Register it through the Capability.</strong> Add the implementation to the Capability’s private Adapter selection. Workflows call the Capability; they never import your SDK.</li><li><strong>Supply a Recipe.</strong> Select the approved Adapter version and permitted network/timing settings. Preserve that binding on each operation.</li><li><strong>Prove it.</strong> Test identity mismatch, missing approval, cancellation, cleanup, lost responses and repeated operation IDs before integrating it into the Journey.</li></ol>
+<p>This is the existing minimal recovery contract. It illustrates what a provider session must return; send and export require their additional contracts.</p><pre><code>type WalletSDK = {
+  waitForInitialization(): Promise&lt;unknown&gt;
+  recover(account: string, encryptionSession: string): Promise&lt;{
+    id: string
+    address: string
+    chainId?: number
+    accountType?: string
+  }&gt;
+  logout(exportCompleted: boolean): Promise&lt;unknown&gt;
+}</code></pre><p>Use <code>src/adapter/adapter_openfort.ts</code> as the implementation reference. The <code>encryptionSession</code> handoff here is Openfort/Shield-specific. A different provider needs an agreed access contract with the Capability and backend; do not put an unrelated credential into that field.</p>
+<h3>How your work fits</h3><pre><code>User intent and explicit confirmation
+  → Journey owns the send outcome
+    → Workflows prepare, execute and reconcile
+      → shared Tools check intent, identity and evidence
+      → Capability owns the provider-independent contract
+        → your Adapter translates to your wallet provider
+
+Recipe selects the approved provider and settings.
+Resources preserve the wallet, intent, operation and evidence.</code></pre><p>The provider backend supplies account provisioning and permitted temporary access. Service secrets stay server-side. An access handoff is not transfer approval. See <code>docs/GATEWAY_CONTRACT.md</code> for this client’s Species integration contract.</p>
+<p>Completion needs matching evidence. This client verifies current transaction inclusion, including the exact USDC event where relevant; it does not promise irreversible finality. A timeout after possible broadcast remains unresolved. Keep the original identity and binding and recover it instead of sending again.</p>
+<p>If the bridge also changes an Onli thing, agree the Onli-side operation and Oracle event contract separately. This client supplies no Oracle-writing endpoint. A blockchain receipt proves neither that the Onli-side effect occurred nor that its Oracle was updated.</p>
+<h3>Encryption is part of the contract</h3>
+<p><strong>In transit:</strong> use authenticated, encrypted connections between the client, Onli and your provider. Validate certificates and authenticate the caller. Where the Capability requires an encrypted message envelope, preserve its format and integrity checks; encryption does not replace permission checks.</p>
+<p><strong>At rest:</strong> encrypt sensitive persisted data, including wallet key material, backups, credentials and protected operation data. Keep encryption keys separate from the data, restrict access and define key rotation and recovery. Never persist plaintext private keys or session secrets in browser storage or logs.</p>
+<p>Your Adapter must meet both requirements and document who owns the keys at each boundary. Use the agreed cryptographic formats and tested libraries; do not invent a new encryption scheme.</p>
+<p>In this implementation, the Species proxy uses authenticated AES-256-GCM message envelopes and encrypted backup files use the existing canonical format. The proxy permits loopback HTTP for local development; production connections require HTTPS. Browser continuity records contain operation metadata and are currently stored without application-level encryption. They contain no plaintext private keys or session tokens, but encrypted storage for protected metadata and provider-side encryption at rest must be established and verified for a production integration.</p>
+<h3>Your deliverables</h3><p>Provide the Adapter, approved Recipe binding, identity/permission mapping, recovery rules, encryption and key-management evidence, and passing contract tests. Include backend requirements and evidence from real provider testing. The reusable send architecture then calls your implementation through the Capability.</p><pre><code>npm ci
+npm run check
+npm run check:security
+npm run check:licenses</code></pre><p>Start with <code>tests/wallet-sdk.test.mjs</code> and <code>tests/contracts/transfer-continuity.test.mjs</code>. These prove local contracts with test doubles; live provider verification is a separate integration step.</p><p><a href="#concepts">Return to the concepts</a> · <a href="/">Open the wallet demo</a></p></main><footer>Onli wallet integration guide · 2 October 2026 · Concept model supplied by Onli; implementation examples refer to this wallet client and local Species proxy.</footer></body></html>

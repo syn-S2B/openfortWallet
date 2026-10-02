@@ -1,0 +1,721 @@
+{
+  "version": "wallet-contract-inventory/v1",
+  "notes": "Semantic unit names identify responsibilities; source_symbol locates the implementation or factory method. Compatibility aliases are not additional architectural units. Promise rejection of a read is unavailable observation, not an effect failure. Declared operation states apply as relevant to the unit. Test mappings are evidence pointers, not a live-provider certification.",
+  "tools": [
+    {
+      "name": "tool_validate_transfer_address",
+      "responsibility": "Canonical nonzero checksummed EVM destination",
+      "service_owner": "wallet client",
+      "source": "src/tool/tool_validate_transfer.ts",
+      "source_symbol": "address",
+      "inputs": "address text",
+      "resources": "TransferIntent.Identity",
+      "resource_parts": "TransferIntent.Identity",
+      "authority": "none; pure validation",
+      "effect": "none",
+      "result_states": [
+        "completed",
+        "unmet_requirements"
+      ],
+      "completion_condition": "canonical address and checksum",
+      "evidence": "canonical address and checksum",
+      "retry_semantics": "repeatable",
+      "used_by_workflows": "workflow_prepare_transfer",
+      "contract_tests": [
+        "tests/wallet-chain.test.mjs"
+      ],
+      "contract_test_status": "Local tests listed; live provider behavior unverified where applicable"
+    },
+    {
+      "name": "tool_parse_transfer_amount",
+      "responsibility": "Exact positive asset units",
+      "service_owner": "wallet client",
+      "source": "src/tool/tool_validate_transfer.ts",
+      "source_symbol": "parseAmount",
+      "inputs": "decimal amount, asset",
+      "resources": "TransferIntent.Content",
+      "resource_parts": "TransferIntent.Content",
+      "authority": "none; pure validation",
+      "effect": "none",
+      "result_states": [
+        "completed",
+        "unmet_requirements"
+      ],
+      "completion_condition": "bounded exact integer units",
+      "evidence": "bounded exact integer units",
+      "retry_semantics": "repeatable",
+      "used_by_workflows": "workflow_prepare_transfer",
+      "contract_tests": [
+        "tests/wallet-chain.test.mjs"
+      ],
+      "contract_test_status": "Local tests listed; live provider behavior unverified where applicable"
+    },
+    {
+      "name": "tool_verify_transfer_quote",
+      "responsibility": "Verify immutable intent, transaction and fee freshness",
+      "service_owner": "wallet client",
+      "source": "src/tool/tool_validate_transfer.ts",
+      "source_symbol": "assertQuote",
+      "inputs": "wallet, quote, clock",
+      "resources": "Wallet.Identity/Content; Quote.Content/Context",
+      "resource_parts": "Wallet.Identity/Content; Quote.Content/Context",
+      "authority": "no effect; requirements only",
+      "effect": "none",
+      "result_states": [
+        "completed",
+        "unmet_requirements"
+      ],
+      "completion_condition": "wallet, payload, amount, fee and expiry checks",
+      "evidence": "wallet, payload, amount, fee and expiry checks",
+      "retry_semantics": "repeatable",
+      "used_by_workflows": "workflow_review_transfer; workflow_execute_transfer",
+      "contract_tests": [
+        "tests/contracts/transfer-continuity.test.mjs",
+        "tests/wallet-chain.test.mjs"
+      ],
+      "contract_test_status": "Local tests listed; live provider behavior unverified where applicable"
+    },
+    {
+      "name": "tool_compare_wallet_identity",
+      "responsibility": "Verify the exact issued wallet identity",
+      "service_owner": "wallet client",
+      "source": "src/tool/tool_compare_wallet_identity.ts",
+      "source_symbol": "assertSameWallet",
+      "inputs": "expected wallet, observed wallet",
+      "resources": "Wallet.Identity/Content",
+      "resource_parts": "Wallet.Identity/Content",
+      "authority": "no effect; identity is not authority",
+      "effect": "none",
+      "result_states": [
+        "completed",
+        "unmet_requirements"
+      ],
+      "completion_condition": "same user/account/wallet/address/chain/custody/type",
+      "evidence": "same user/account/wallet/address/chain/custody/type",
+      "retry_semantics": "repeatable",
+      "used_by_workflows": "workflow_recover_wallet_session",
+      "contract_tests": [
+        "tests/export.test.mjs"
+      ],
+      "contract_test_status": "Local tests listed; live provider behavior unverified where applicable"
+    },
+    {
+      "name": "tool_verify_transfer_confirmation",
+      "responsibility": "Require explicit confirmation of the exact reviewed transaction",
+      "service_owner": "wallet client",
+      "source": "src/tool/tool_verify_transfer_confirmation.ts",
+      "source_symbol": "tool_verify_transfer_confirmation",
+      "inputs": "wallet, quote, confirmation, clock",
+      "resources": "Wallet.Identity; Quote.Content/Context; Confirmation.Content",
+      "resource_parts": "Wallet.Identity; Quote.Content/Context; Confirmation.Content",
+      "authority": "explicit confirmation plus owner-authorized session required later",
+      "effect": "none",
+      "result_states": [
+        "completed",
+        "unmet_requirements"
+      ],
+      "completion_condition": "same quote time, chain, wallet, payload and operation identity",
+      "evidence": "same quote time, chain, wallet, payload and operation identity",
+      "retry_semantics": "repeatable validation; no implicit confirmation",
+      "used_by_workflows": "workflow_execute_transfer; journey_send_transfer",
+      "contract_tests": [
+        "tests/contracts/workflow-context.test.mjs"
+      ],
+      "contract_test_status": "Local tests listed; live provider behavior unverified where applicable"
+    },
+    {
+      "name": "tool_create_transfer_operation",
+      "responsibility": "Create nonsecret continuity representation",
+      "service_owner": "wallet client",
+      "source": "src/tool/tool_create_transfer_operation.ts",
+      "source_symbol": "createTransferOperation",
+      "inputs": "wallet, quote, operation ID",
+      "resources": "Wallet.Identity; Quote.Content; Recipe.Content",
+      "resource_parts": "Wallet.Identity; Quote.Content; Recipe.Content",
+      "authority": "confirmed intent supplied by Journey",
+      "effect": "creates local representation",
+      "result_states": [
+        "completed",
+        "pending",
+        "unmet_requirements",
+        "failed",
+        "indeterminate"
+      ],
+      "completion_condition": "complete frozen intent and provider/recipe binding",
+      "evidence": "complete frozen intent and provider/recipe binding",
+      "retry_semantics": "same operation ID only for same intent",
+      "used_by_workflows": "journey_send_transfer",
+      "contract_tests": [
+        "tests/contracts/transfer-continuity.test.mjs"
+      ],
+      "contract_test_status": "Local tests listed; live provider behavior unverified where applicable"
+    },
+    {
+      "name": "tool_verify_transfer_evidence",
+      "responsibility": "Verify evidence of the exact chain effect",
+      "service_owner": "wallet client",
+      "source": "src/tool/tool_verify_transfer_evidence.ts",
+      "source_symbol": "tool_verify_transfer_evidence",
+      "inputs": "original operation, transaction/receipt observation",
+      "resources": "TransferOperation.Identity/Content; Observation.Content",
+      "resource_parts": "TransferOperation.Identity/Content; Observation.Content",
+      "authority": "public verification; does not authorize a new effect",
+      "effect": "none",
+      "result_states": [
+        "completed",
+        "unmet_requirements"
+      ],
+      "completion_condition": "matching transaction/receipt/block plus exact USDC event when needed",
+      "evidence": "matching transaction/receipt/block plus exact USDC event when needed",
+      "retry_semantics": "repeatable observation; unavailable is unresolved",
+      "used_by_workflows": "workflow_reconcile_transfer",
+      "contract_tests": [
+        "tests/contracts/transfer-continuity.test.mjs"
+      ],
+      "contract_test_status": "Local tests listed; live provider behavior unverified where applicable"
+    },
+    {
+      "name": "tool_compare_external_wallet",
+      "responsibility": "Compare expected and observed account/chain",
+      "service_owner": "wallet client",
+      "source": "src/tool/tool_compare_external_wallet.ts",
+      "source_symbol": "tool_compare_external_wallet",
+      "inputs": "expected wallet identity, observed account",
+      "resources": "Wallet.Identity; ExternalAccount.Identity",
+      "resource_parts": "Wallet.Identity; ExternalAccount.Identity",
+      "authority": "no signing or import authority",
+      "effect": "none",
+      "result_states": [
+        "completed",
+        "unmet_requirements"
+      ],
+      "completion_condition": "explicit address and chain comparison",
+      "evidence": "explicit address and chain comparison",
+      "retry_semantics": "repeatable",
+      "used_by_workflows": "journey_connect_external_wallet",
+      "contract_tests": [
+        "tests/contracts/workflow-context.test.mjs"
+      ],
+      "contract_test_status": "Local tests listed; live provider behavior unverified where applicable"
+    },
+    {
+      "name": "tool_verify_treasury_binding",
+      "responsibility": "Verify selected treasury wallet projection",
+      "service_owner": "wallet client",
+      "source": "src/tool/tool_verify_treasury_binding.ts",
+      "source_symbol": "assertTreasuryBinding",
+      "inputs": "wallet, expected account/address/chain",
+      "resources": "TreasuryWallet.Identity/Content",
+      "resource_parts": "TreasuryWallet.Identity/Content",
+      "authority": "backend admin authorization remains separate",
+      "effect": "none",
+      "result_states": [
+        "completed",
+        "unmet_requirements"
+      ],
+      "completion_condition": "exact account/address/chain/type binding",
+      "evidence": "exact account/address/chain/type binding",
+      "retry_semantics": "repeatable",
+      "used_by_workflows": "workflow_resolve_treasury_backup; workflow_wallet_backup",
+      "contract_tests": [
+        "tests/contracts/backup-workflow.test.mjs",
+        "tests/gateway.test.mjs"
+      ],
+      "contract_test_status": "Local tests listed; live provider behavior unverified where applicable"
+    },
+    {
+      "name": "tool_record_backup_release",
+      "responsibility": "Fence a one-use approval before submission",
+      "service_owner": "wallet client",
+      "source": "src/tool/tool_record_backup_release.ts",
+      "source_symbol": "tool_record_backup_release",
+      "inputs": "owner, proof reference, scope, effect",
+      "resources": "Approval.Identity; BackupReleaseOperation.Identity/Content",
+      "resource_parts": "Approval.Identity; BackupReleaseOperation.Identity/Content",
+      "authority": "explicit proof plus backend session enforcement",
+      "effect": "durable nonsecret pre-effect record",
+      "result_states": [
+        "completed",
+        "pending",
+        "unmet_requirements",
+        "failed",
+        "indeterminate"
+      ],
+      "completion_condition": "write succeeds before request and same approval cannot replay",
+      "evidence": "write succeeds before request and same approval cannot replay",
+      "retry_semantics": "never repeat same submitted proof",
+      "used_by_workflows": "workflow_wallet_backup",
+      "contract_tests": [
+        "tests/contracts/backup-release-continuity.test.mjs"
+      ],
+      "contract_test_status": "Local tests listed; live provider behavior unverified where applicable"
+    },
+    {
+      "name": "tool_complete_backup_release",
+      "responsibility": "Record verified release evidence",
+      "service_owner": "wallet client",
+      "source": "src/tool/tool_record_backup_release.ts",
+      "source_symbol": "tool_complete_backup_release",
+      "inputs": "owner, proof reference, file digest",
+      "resources": "BackupReleaseOperation.Identity/Content",
+      "resource_parts": "BackupReleaseOperation.Identity/Content",
+      "authority": "matching prior operation",
+      "effect": "durable completion record",
+      "result_states": [
+        "completed",
+        "pending",
+        "unmet_requirements",
+        "failed",
+        "indeterminate"
+      ],
+      "completion_condition": "owner/proof match and bound artifact digest",
+      "evidence": "owner/proof match and bound artifact digest",
+      "retry_semantics": "same operation; never reissue",
+      "used_by_workflows": "workflow_wallet_backup",
+      "contract_tests": [
+        "tests/contracts/backup-release-continuity.test.mjs"
+      ],
+      "contract_test_status": "Local tests listed; live provider behavior unverified where applicable"
+    },
+    {
+      "name": "tool_encrypt_wallet_backup",
+      "responsibility": "Produce address-verified encrypted backup",
+      "service_owner": "wallet client",
+      "source": "src/wallet-backup/crypto.ts",
+      "source_symbol": "createWalletBackupCrypto.encryptWalletBackup",
+      "inputs": "key, wallet, owner, wrapping config",
+      "resources": "Wallet.Identity; BackupConfig.Content; ephemeral key Content",
+      "resource_parts": "Wallet.Identity; BackupConfig.Content; ephemeral key Content",
+      "authority": "authorized member export or approved treasury release",
+      "effect": "encrypted artifact",
+      "result_states": [
+        "completed",
+        "pending",
+        "unmet_requirements",
+        "failed",
+        "indeterminate"
+      ],
+      "completion_condition": "canonical file format, address binding and round-trip vectors",
+      "evidence": "canonical file format, address binding and round-trip vectors",
+      "retry_semantics": "new artifact uses independent key/nonce; no private persistence",
+      "used_by_workflows": "workflow_create_member_backup; workflow_wallet_backup",
+      "contract_tests": [
+        "tests/wallet-backup.test.mjs"
+      ],
+      "contract_test_status": "Local tests listed; live provider behavior unverified where applicable"
+    },
+    {
+      "name": "tool_decrypt_wallet_backup",
+      "responsibility": "Open a bound encrypted file using scoped release",
+      "service_owner": "wallet client",
+      "source": "src/wallet-backup/crypto.ts",
+      "source_symbol": "createWalletBackupCrypto.decryptWalletBackup",
+      "inputs": "file, release ID, wrapped key, ephemeral recipient",
+      "resources": "BackupFile.Content; Approval.Identity; temporary recipient Content",
+      "resource_parts": "BackupFile.Content; Approval.Identity; temporary recipient Content",
+      "authority": "fresh owner/admin approval and verified one-use release",
+      "effect": "transient key reveal material",
+      "result_states": [
+        "completed",
+        "pending",
+        "unmet_requirements",
+        "failed",
+        "indeterminate"
+      ],
+      "completion_condition": "OAEP labels, file digest and key/address match",
+      "evidence": "OAEP labels, file digest and key/address match",
+      "retry_semantics": "fresh proof/recipient for recovery; clear transient buffers",
+      "used_by_workflows": "workflow_wallet_backup",
+      "contract_tests": [
+        "tests/wallet-backup.test.mjs"
+      ],
+      "contract_test_status": "Local tests listed; live provider behavior unverified where applicable"
+    },
+    {
+      "name": "tool_capability_wallet_session",
+      "responsibility": "Own provider binding, operation lock and scoped handle lifetime",
+      "service_owner": "wallet client",
+      "source": "src/capability/tool_capability_wallet_session.ts",
+      "source_symbol": "createWalletSessionCapability",
+      "inputs": "provider recipe, callback using factory",
+      "resources": "Recipe.Content; WalletAccess.Content; ephemeral SDK state",
+      "resource_parts": "Recipe.Content; WalletAccess.Content; ephemeral SDK state",
+      "authority": "fresh handoff validated by recovery Workflow; send enforces confirmation",
+      "effect": "recovery/export/signing session lifecycle",
+      "result_states": [
+        "completed",
+        "pending",
+        "unmet_requirements",
+        "failed",
+        "indeterminate"
+      ],
+      "completion_condition": "lock retained through teardown; inactive handles fenced; reload guard on uncertainty",
+      "evidence": "lock retained through teardown; inactive handles fenced; reload guard on uncertainty",
+      "retry_semantics": "no new SDK session after unverified cleanup",
+      "used_by_workflows": "workflow_recover_wallet_session; workflow_execute_transfer",
+      "contract_tests": [
+        "tests/wallet-sdk.test.mjs",
+        "tests/wallet-session-reset.test.mjs"
+      ],
+      "contract_test_status": "Local tests listed; live provider behavior unverified where applicable"
+    },
+    {
+      "name": "tool_capability_read_wallet_observations",
+      "responsibility": "Read chain-bound balances and explorer projections",
+      "service_owner": "wallet client",
+      "source": "src/capability/tool_capability_chain.ts",
+      "source_symbol": "readBalances/readActivity",
+      "inputs": "wallet identity, selected read",
+      "resources": "Wallet.Identity/Content; Recipe.Content",
+      "resource_parts": "Wallet.Identity/Content; Recipe.Content",
+      "authority": "public reads only",
+      "effect": "observations",
+      "result_states": [
+        "completed",
+        "pending",
+        "unmet_requirements",
+        "failed",
+        "indeterminate"
+      ],
+      "completion_condition": "verified chain for balance, qualified explorer activity/time",
+      "evidence": "verified chain for balance, qualified explorer activity/time",
+      "retry_semantics": "safe read retry; never replace unavailable with zero",
+      "used_by_workflows": "workflow_read_wallet_observations; workflow_prepare_transfer",
+      "contract_tests": [
+        "tests/wallet-chain.test.mjs",
+        "tests/contracts/workflow-context.test.mjs"
+      ],
+      "contract_test_status": "Local tests listed; live provider behavior unverified where applicable"
+    },
+    {
+      "name": "tool_capability_estimate_transfer",
+      "responsibility": "Read fee inputs for exact transaction",
+      "service_owner": "wallet client",
+      "source": "src/capability/tool_capability_chain.ts",
+      "source_symbol": "createChainCapability.estimate",
+      "inputs": "canonical transaction, bound chain",
+      "resources": "TransferIntent.Content; Recipe.Content",
+      "resource_parts": "TransferIntent.Content; Recipe.Content",
+      "authority": "read-only",
+      "effect": "fee observation",
+      "result_states": [
+        "completed",
+        "pending",
+        "unmet_requirements",
+        "failed",
+        "indeterminate"
+      ],
+      "completion_condition": "valid chain-bound fee data; no fallback estimate",
+      "evidence": "valid chain-bound fee data; no fallback estimate",
+      "retry_semantics": "safe read retry",
+      "used_by_workflows": "workflow_prepare_transfer",
+      "contract_tests": [
+        "tests/wallet-chain.test.mjs"
+      ],
+      "contract_test_status": "Local tests listed; live provider behavior unverified where applicable"
+    },
+    {
+      "name": "tool_capability_submit_transfer",
+      "responsibility": "Submit the confirmed reviewed intent once",
+      "service_owner": "wallet client",
+      "source": "src/adapter/adapter_openfort.ts",
+      "source_symbol": "sendTransfer (private handle called through wallet-session Capability)",
+      "inputs": "wallet, quote, confirmation, continuity callback",
+      "resources": "Wallet.Identity/Content; Confirmation.Content; TransferOperation.Identity",
+      "resource_parts": "Wallet.Identity/Content; Confirmation.Content; TransferOperation.Identity",
+      "authority": "explicit same-quote confirmation, fresh owner-scoped recovery, same signer/chain",
+      "effect": "transaction broadcast",
+      "result_states": [
+        "completed",
+        "pending",
+        "unmet_requirements",
+        "failed",
+        "indeterminate"
+      ],
+      "completion_condition": "hash is submission evidence only; receipt verification is separate",
+      "evidence": "hash is submission evidence only; receipt verification is separate",
+      "retry_semantics": "no automatic broadcast retry; same-operation replay handled by Journey",
+      "used_by_workflows": "workflow_execute_transfer",
+      "contract_tests": [
+        "tests/wallet-chain.test.mjs",
+        "tests/contracts/transfer-continuity.test.mjs"
+      ],
+      "contract_test_status": "Local tests listed; live provider behavior unverified where applicable"
+    },
+    {
+      "name": "tool_capability_observe_transfer",
+      "responsibility": "Observe original effect without rebinding",
+      "service_owner": "wallet client",
+      "source": "src/capability/tool_capability_observe_transfer.ts",
+      "source_symbol": "tool_capability_observe_transfer",
+      "inputs": "wallet, persisted operation",
+      "resources": "TransferOperation.Identity/Content; original Recipe.Content",
+      "resource_parts": "TransferOperation.Identity/Content; original Recipe.Content",
+      "authority": "public reads; original chain/recipe required",
+      "effect": "observation",
+      "result_states": [
+        "completed",
+        "pending",
+        "unmet_requirements",
+        "failed",
+        "indeterminate"
+      ],
+      "completion_condition": "exact recorded transaction and receipt verified by Tool",
+      "evidence": "exact recorded transaction and receipt verified by Tool",
+      "retry_semantics": "repeat reads; hashless and legacy intentless operations stay unresolved",
+      "used_by_workflows": "workflow_reconcile_transfer",
+      "contract_tests": [
+        "tests/contracts/transfer-continuity.test.mjs",
+        "tests/wallet-ui.test.mjs"
+      ],
+      "contract_test_status": "Local tests listed; live provider behavior unverified where applicable"
+    },
+    {
+      "name": "tool_capability_authorize_action",
+      "responsibility": "Obtain owner-bound Species session through approval",
+      "service_owner": "wallet client",
+      "source": "src/capability/tool_capability_authentication.ts",
+      "source_symbol": "startAuthentication/observeAuthentication",
+      "inputs": "identity/challenge",
+      "resources": "AuthenticationChallenge.Identity/Content; Session.Content",
+      "resource_parts": "AuthenticationChallenge.Identity/Content; Session.Content",
+      "authority": "Onli acceptance enforced by Species",
+      "effect": "external authentication challenge",
+      "result_states": [
+        "completed",
+        "pending",
+        "unmet_requirements",
+        "failed",
+        "indeterminate"
+      ],
+      "completion_condition": "accepted session token and verified owner reference from authenticated gateway",
+      "evidence": "accepted session token and verified owner reference from authenticated gateway",
+      "retry_semantics": "observe same challenge; abort does not prove backend cancellation",
+      "used_by_workflows": "journey_sign_in",
+      "contract_tests": [
+        "tests/app-session.test.mjs"
+      ],
+      "contract_test_status": "Local tests listed; live provider behavior unverified where applicable"
+    },
+    {
+      "name": "tool_capability_register_member",
+      "responsibility": "Submit and observe the original registration",
+      "service_owner": "wallet client",
+      "source": "src/capability/tool_capability_member.ts",
+      "source_symbol": "startMemberRegistration/observeMemberRegistration",
+      "inputs": "session, server-issued arguments, operation ID",
+      "resources": "Session.Content; RegistrationOperation.Identity/Content; Connection.Identity",
+      "resource_parts": "Session.Content; RegistrationOperation.Identity/Content; Connection.Identity",
+      "authority": "Species owner and registration contract",
+      "effect": "backend registration",
+      "result_states": [
+        "completed",
+        "pending",
+        "unmet_requirements",
+        "failed",
+        "indeterminate"
+      ],
+      "completion_condition": "same operation status; readiness separately proves wallet outcome",
+      "evidence": "same operation status; readiness separately proves wallet outcome",
+      "retry_semantics": "same original idempotency/correlation keys and connection binding",
+      "used_by_workflows": "journey_open_member_wallet; workflow_observe_registration",
+      "contract_tests": [
+        "tests/onboarding.test.mjs",
+        "tests/contracts/registration-continuity.test.mjs"
+      ],
+      "contract_test_status": "Local tests listed; live provider behavior unverified where applicable"
+    },
+    {
+      "name": "tool_capability_ensure_wallet",
+      "responsibility": "Ensure/reconcile owner wallet selected by readiness",
+      "service_owner": "wallet client",
+      "source": "src/capability/tool_capability_member.ts",
+      "source_symbol": "ensureMemberWallet",
+      "inputs": "session and trusted readiness selection",
+      "resources": "Session.Content; Wallet.Identity; Readiness.Context",
+      "resource_parts": "Session.Content; Wallet.Identity; Readiness.Context",
+      "authority": "Species owner-scoped eligibility",
+      "effect": "backend ensure/reconcile",
+      "result_states": [
+        "completed",
+        "pending",
+        "unmet_requirements",
+        "failed",
+        "indeterminate"
+      ],
+      "completion_condition": "authoritative owner-scoped wallet; backend owns issuance continuity",
+      "evidence": "authoritative owner-scoped wallet; backend owns issuance continuity",
+      "retry_semantics": "backend ensure contract; no client-created replacement wallet",
+      "used_by_workflows": "workflow_resolve_member_readiness",
+      "contract_tests": [
+        "tests/app-session.test.mjs",
+        "tests/gateway.test.mjs"
+      ],
+      "contract_test_status": "Local tests listed; live provider behavior unverified where applicable"
+    },
+    {
+      "name": "tool_capability_read_wallet_access",
+      "responsibility": "Read fresh recovery handoff for issued wallet",
+      "service_owner": "wallet client",
+      "source": "src/capability/tool_capability_member.ts",
+      "source_symbol": "readWalletAccess",
+      "inputs": "session and expected wallet",
+      "resources": "Session.Content; Wallet.Identity; WalletAccess.Content",
+      "resource_parts": "Session.Content; Wallet.Identity; WalletAccess.Content",
+      "authority": "Species owner-scoped handoff; no trading approval inferred",
+      "effect": "short-lived access",
+      "result_states": [
+        "completed",
+        "pending",
+        "unmet_requirements",
+        "failed",
+        "indeterminate"
+      ],
+      "completion_condition": "recovery Workflow verifies identity/expiry/provider binding",
+      "evidence": "recovery Workflow verifies identity/expiry/provider binding",
+      "retry_semantics": "renew same wallet and provider keys only",
+      "used_by_workflows": "workflow_recover_wallet_session",
+      "contract_tests": [
+        "tests/export.test.mjs"
+      ],
+      "contract_test_status": "Local tests listed; live provider behavior unverified where applicable"
+    },
+    {
+      "name": "tool_capability_release_backup_material",
+      "responsibility": "Release to approved ephemeral recipient once",
+      "service_owner": "wallet client",
+      "source": "src/capability/tool_capability_backup.ts",
+      "source_symbol": "createBackupCapability.release/export",
+      "inputs": "session, scope, bound body, proof",
+      "resources": "Session.Content; Approval.Identity; BackupFile.Content; recipient public Content",
+      "resource_parts": "Session.Content; Approval.Identity; BackupFile.Content; recipient public Content",
+      "authority": "explicit proof, durable fence, backend owner/admin one-use checks",
+      "effect": "external wrapped material release",
+      "result_states": [
+        "completed",
+        "pending",
+        "unmet_requirements",
+        "failed",
+        "indeterminate"
+      ],
+      "completion_condition": "Workflow checks proof/digest/recipient/wallet/expiry and decrypts before completion",
+      "evidence": "Workflow checks proof/digest/recipient/wallet/expiry and decrypts before completion",
+      "retry_semantics": "lost response is indeterminate; fresh approval/recipient is explicit safe recovery",
+      "used_by_workflows": "workflow_wallet_backup",
+      "contract_tests": [
+        "tests/contracts/backup-capability.test.mjs",
+        "tests/contracts/backup-workflow.test.mjs"
+      ],
+      "contract_test_status": "Local tests listed; live provider behavior unverified where applicable"
+    },
+    {
+      "name": "tool_capability_deliver_file",
+      "responsibility": "Initiate delivery of a verified encrypted artifact",
+      "service_owner": "wallet client",
+      "source": "src/capability/tool_capability_deliver_file.ts",
+      "source_symbol": "tool_capability_deliver_file",
+      "inputs": "file and filename",
+      "resources": "BackupFile.Content",
+      "resource_parts": "BackupFile.Content",
+      "authority": "caller requested export; artifact already encrypted",
+      "effect": "browser download initiation",
+      "result_states": [
+        "completed",
+        "pending",
+        "unmet_requirements",
+        "failed",
+        "indeterminate"
+      ],
+      "completion_condition": "file digest plus initiation; no filesystem-save claim",
+      "evidence": "file digest plus initiation; no filesystem-save claim",
+      "retry_semantics": "repeat delivery is permitted; key acquisition not implicitly repeated",
+      "used_by_workflows": "journey_export_wallet_backup",
+      "contract_tests": [
+        "tests/contracts/file-delivery.test.mjs"
+      ],
+      "contract_test_status": "Local tests listed; live provider behavior unverified where applicable"
+    },
+    {
+      "name": "tool_capability_observe_external_account",
+      "responsibility": "Observe public permitted account and network",
+      "service_owner": "wallet client",
+      "source": "src/capability/tool_capability_external_account.ts",
+      "source_symbol": "externalAccountCapability",
+      "inputs": "selected external binding, consent flag",
+      "resources": "ExternalAccount.Identity/Context",
+      "resource_parts": "ExternalAccount.Identity/Context",
+      "authority": "browser account permission only",
+      "effect": "permission prompt/public observation",
+      "result_states": [
+        "completed",
+        "pending",
+        "unmet_requirements",
+        "failed",
+        "indeterminate"
+      ],
+      "completion_condition": "valid account/chain; subscriptions disposed",
+      "evidence": "valid account/chain; subscriptions disposed",
+      "retry_semantics": "no signing/export; refresh does not reprompt",
+      "used_by_workflows": "journey_connect_external_wallet",
+      "contract_tests": [
+        "tests/phantom.test.mjs",
+        "tests/contracts/workflow-context.test.mjs"
+      ],
+      "contract_test_status": "Local tests listed; live provider behavior unverified where applicable"
+    },
+    {
+      "name": "tool_gateway_envelope",
+      "responsibility": "Authenticate Species request/response envelope",
+      "service_owner": "local Node proxy",
+      "source": "server/tool/tool_gateway_envelope.mjs",
+      "source_symbol": "seal/open",
+      "inputs": "bytes, key reference, direction, method, escaped path, symbol",
+      "resources": "GatewayEnvelope.Content; Connection.Content",
+      "resource_parts": "GatewayEnvelope.Content; Connection.Content",
+      "authority": "server-held Appliance credentials; no browser secrets",
+      "effect": "ciphertext or verified plaintext in Node only",
+      "result_states": [
+        "completed",
+        "pending",
+        "unmet_requirements",
+        "failed",
+        "indeterminate"
+      ],
+      "completion_condition": "AES-GCM tag and exact AAD binding",
+      "evidence": "AES-GCM tag and exact AAD binding",
+      "retry_semantics": "fresh nonce for each request; no effect retry here",
+      "used_by_workflows": "local gateway Capability",
+      "contract_tests": [
+        "tests/gateway.test.mjs"
+      ],
+      "contract_test_status": "Local tests listed; live provider behavior unverified where applicable"
+    },
+    {
+      "name": "tool_capability_species_gateway",
+      "responsibility": "Perform authenticated bounded Species transport",
+      "service_owner": "local Node proxy",
+      "source": "server/capability/tool_capability_species_gateway.mjs",
+      "source_symbol": "createGateway",
+      "inputs": "allowed method/path, session, body, approved headers",
+      "resources": "Connection.Content; GatewayEnvelope.Content; Session.Content",
+      "resource_parts": "Connection.Content; GatewayEnvelope.Content; Session.Content",
+      "authority": "route admission plus backend owner/admin policy",
+      "effect": "upstream request",
+      "result_states": [
+        "completed",
+        "pending",
+        "unmet_requirements",
+        "failed",
+        "indeterminate"
+      ],
+      "completion_condition": "authenticated success envelope; explicit error or unavailable response",
+      "evidence": "authenticated success envelope; explicit error or unavailable response",
+      "retry_semantics": "no implicit retry of mutations",
+      "used_by_workflows": "local proxy surface",
+      "contract_tests": [
+        "tests/gateway.test.mjs"
+      ],
+      "contract_test_status": "Local tests listed; live provider behavior unverified where applicable"
+    }
+  ]
+}

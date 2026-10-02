@@ -1,0 +1,178 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>How we built the Openfort wallet · Onli Docs</title><link rel="stylesheet" href="docs.css"></head><body><header><a href="index.html">ONLI / DOCS</a><nav aria-label="Documentation"><a href="index.html#concepts">Concepts</a><a href="openfort-walkthrough.html">Openfort walkthrough</a><a href="/">Wallet demo</a><a href="https://github.com/syn-S2B/openfortWallet">GitHub</a></nav></header><main><p class="eyebrow">IMPLEMENTATION / CODE WALKTHROUGH</p><h1>How we built the Openfort wallet.</h1><p class="lead">One send outcome, assembled from shared Tools and Workflows. Openfort is selected through a Recipe.</p><p>These excerpts come from this repository’s actual implementation, reviewed on 2 October 2026. They are selected excerpts, not standalone programs. Each source path identifies where the complete code lives.</p><div class="toc"><a href="#recipe">1. Select Openfort with the Recipe</a><a href="#resources">2. Define the Resources and contracts</a><a href="#tools">3. Prove the small operations</a><a href="#workflows">4. Compose reusable Workflows</a><a href="#binding">5. Connect the Capability to the Adapter</a><a href="#journey">6. Assemble the Journey</a><a href="#evidence">7. Establish the outcome</a><a href="#review">8. Review the rules and proof</a></div>
+<h2 id="recipe">1. Select Openfort with the Recipe</h2><p>Provider selection is a Recipe responsibility. The versioned definition selects <code>openfort/v1</code> for the recovered-wallet-session Capability. It contains no execution or secret values. The external Openfort service is reached through the selected Adapter.</p><p class="eyebrow">src/recipe/wallet-provider.ts</p><pre><code>export type WalletProviderRecipe = {
+  version: &#x27;wallet-provider/v1&#x27;
+  adapter: &#x27;openfort/v1&#x27;
+  capability: &#x27;recovered-wallet-session/v1&#x27;
+}
+export const walletProviderRecipe: Readonly&lt;WalletProviderRecipe&gt; = Object.freeze({
+  version: &#x27;wallet-provider/v1&#x27;,
+  adapter: &#x27;openfort/v1&#x27;,
+  capability: &#x27;recovered-wallet-session/v1&#x27;,
+})</code></pre><p>The separate <code>wallet-network/v1</code> Recipe defines mainnet/Sepolia RPC, token and explorer settings. <code>wallet-polling/v1</code> holds observation intervals and quote lifetime. The transfer records its selected bindings before any effect; recovery cannot silently substitute another selection.</p>
+<h2 id="resources">2. Define the Resources and contracts</h2><p>The wallet’s identity comes from Species. The client verifies the account reference, address, custody/type and any reported chain. A transfer Resource preserves operation identity, exact intent, bindings, hash and evidence. A quote contains the exact transaction and its fee/time limits.</p><p>The session interface names the operations Workflows need. It exposes no raw provider handle. Openfort implements this interface privately.</p><p class="eyebrow">src/contracts/wallet-session.ts</p><pre><code>import type { Wallet, WalletAccess } from &#x27;./species.ts&#x27;
+import type { Quote } from &#x27;./wallet.ts&#x27;
+import type { TransferConfirmation } from &#x27;./transfer-confirmation.ts&#x27;
+export type WalletSDK = {
+  waitForInitialization(): Promise&lt;unknown&gt;
+  recover(
+    account: string,
+    encryptionSession: string,
+  ): Promise&lt;{ id: string; address: string; chainId?: number; accountType?: string }&gt;
+  logout(exportCompleted: boolean): Promise&lt;unknown&gt;
+}
+export type ExportSDK = WalletSDK &amp; { exportPrivateKey(): Promise&lt;string&gt; }
+/** Canonical scoped operations; provider handles remain private. */
+export type RecoveredWalletSession = ExportSDK &amp; {
+  sendTransfer(
+    wallet: Wallet,
+    quote: Quote,
+    check: () =&gt; void,
+    broadcastStarted: () =&gt; void,
+    confirmation: TransferConfirmation,
+  ): Promise&lt;string&gt;
+}
+export type WalletSessionFactory = (
+  access: WalletAccess,
+  getAccessToken: () =&gt; Promise&lt;string&gt;,
+) =&gt; RecoveredWalletSession</code></pre><h2 id="tools">3. Prove the small operations</h2><div class="table-wrap"><table><thead><tr><th>Responsibility</th><th>Source owner</th><th>Used for</th></tr></thead><tbody><tr><td>Address, units and quote checks</td><td><code>tool_validate_transfer.ts</code></td><td>Prepare and execution</td></tr><tr><td>Wallet identity comparison</td><td><code>tool_compare_wallet_identity.ts</code></td><td>Access renewal and recovery</td></tr><tr><td>Exact confirmation check</td><td><code>tool_verify_transfer_confirmation.ts</code></td><td>Journey, execution and submission boundary</td></tr><tr><td>Operation creation</td><td><code>tool_create_transfer_operation.ts</code></td><td>Durable continuity before broadcast</td></tr><tr><td>Transfer evidence verification</td><td><code>tool_verify_transfer_evidence.ts</code></td><td>Completion/failure observation</td></tr></tbody></table></div><p>The confirmation Tool verifies the reviewed wallet, chain, quote time and exact transaction. Reusing this check at the effect boundary prevents a valid review from authorizing an edited payload.</p><p class="eyebrow">src/tool/tool_verify_transfer_confirmation.ts</p><pre><code>export function tool_verify_transfer_confirmation(
+  wallet: Wallet,
+  quote: Quote,
+  confirmation: TransferConfirmation | undefined,
+  now = Date.now(),
+) {
+  assertQuote(wallet, quote, now)
+  if (
+    !confirmation ||
+    confirmation.kind !== &#x27;explicit_transfer_confirmation&#x27; ||
+    !confirmation.operationId ||
+    confirmation.walletAddress.toLowerCase() !== wallet.address.toLowerCase() ||
+    confirmation.chainId !== wallet.chain_id ||
+    confirmation.quoteCreatedAt !== quote.createdAt ||
+    !Number.isFinite(confirmation.confirmedAt) ||
+    confirmation.confirmedAt &lt; quote.createdAt ||
+    confirmation.confirmedAt &gt; now ||
+    JSON.stringify(confirmation.transaction) !== JSON.stringify(quote.transaction)
+  )
+    throw new WalletError(&#x27;Explicit confirmation of this exact transfer is required.&#x27;)
+}</code></pre><h2 id="workflows">4. Compose reusable Workflows</h2><p>Review selects the destination and checks existing unresolved work. Preparation validates intent, reads balances through the chain Capability and estimates an immutable transaction. Recovery owns the complete access-renewal, initialize, recover, identity-check, action and teardown lifecycle.</p><p>Execution composes recovery with send-specific checks. It does not import Openfort or obtain a raw provider. <code>withWalletSDK</code> is the wallet-session Capability facade; <code>runWalletAction</code> aliases the shared recovery Workflow.</p><p class="eyebrow">src/workflow/workflow_execute_transfer.ts</p><pre><code>export async function workflow_execute_transfer(
+  session: Session,
+  wallet: Wallet,
+  quote: Quote,
+  isCurrent: () =&gt; boolean,
+  broadcastStarted: () =&gt; void,
+  confirmation: TransferConfirmation,
+) {
+  tool_verify_transfer_confirmation(wallet, quote, confirmation)
+  return withWalletSDK((createSDK) =&gt;
+    runWalletAction({
+      wallet,
+      isCurrent,
+      createSDK,
+      getAccess: () =&gt; readWalletAccess(session),
+      async action(sdk, check) {
+        const balance = await readBalances(wallet)
+        check()
+        assertQuote(wallet, quote)
+        if (
+          balance.eth &lt; quote.fee + (quote.asset === &#x27;ETH&#x27; ? quote.units : 0n) ||
+          (quote.asset === &#x27;USDC&#x27; &amp;&amp; balance.usdc &lt; quote.units)
+        )
+          throw new WalletError(&#x27;Your balance changed. Review the transfer again.&#x27;)
+        return sdk.sendTransfer(wallet, quote, check, broadcastStarted, confirmation)
+      },
+    }),
+  )
+}</code></pre><p>Member backup export reuses the same recovery lifecycle through <code>workflow_export_wallet_key</code>. We built recovery once, rather than separate Openfort login/recovery implementations for send and export. Context controls the scoped action.</p>
+<h2 id="binding">5. Connect the Capability to the Adapter</h2><p>The Capability resolves the Recipe’s Adapter binding, owns origin-wide coordination and returns only canonical scoped operations. The provider registry is private to this owner.</p><p class="eyebrow">src/capability/tool_capability_wallet_session.ts</p><pre><code>export function createWalletSessionCapability(recipe: WalletProviderRecipe = walletProviderRecipe) {
+  const adapters = { &#x27;openfort/v1&#x27;: adapter_openfort_factory }
+  const selected = adapters[recipe.adapter]
+  if (!selected || recipe.version !== &#x27;wallet-provider/v1&#x27; || recipe.capability !== &#x27;recovered-wallet-session/v1&#x27;)
+    throw new WalletOperationUnavailable(&#x27;The selected wallet provider binding is unavailable.&#x27;)</code></pre><p>The Adapter alone imports the Openfort SDK and translates the canonical recovery call into its automatic recovery API. Its storage is isolated per operation; the access token callback renews only the permitted handoff.</p><p class="eyebrow">src/adapter/adapter_openfort.ts</p><pre><code>export async function adapter_openfort_factory(cleanup: WalletCleanupGuard): Promise&lt;WalletSessionFactory&gt; {
+  const { Openfort, RecoveryMethod, ThirdPartyOAuthProvider } = await import(&#x27;@openfort/openfort-js&#x27;)
+  return (access: WalletAccess, getAccessToken: () =&gt; Promise&lt;string&gt;) =&gt; {
+    const storage = new WalletSessionStorage()
+    const sdk = new Openfort({
+      baseConfiguration: { publishableKey: access.publishable_key },
+      shieldConfiguration: { shieldPublishableKey: access.shield_publishable_key },
+      thirdPartyAuth: { provider: ThirdPartyOAuthProvider.CUSTOM, getAccessToken },
+      overrides: { storage },
+    })
+    return {
+      waitForInitialization: () =&gt; sdk.waitForInitialization(),
+      recover: (account: string, encryptionSession: string) =&gt;
+        sdk.embeddedWallet.recover({
+          account,
+          recoveryParams: { recoveryMethod: RecoveryMethod.AUTOMATIC, encryptionSession },
+        }),</code></pre><p>The excerpt ends before export, send and logout methods. Send obtains the raw Ethereum provider privately, then calls the EVM submission Adapter. Its checks run again immediately before the effect.</p><p class="eyebrow">src/adapter/adapter_evm_submit.ts</p><pre><code>check()
+  tool_verify_transfer_confirmation(wallet, quote, confirmation)
+  assertQuote(wallet, quote)
+  const [chain, accounts] = await Promise.all([
+    provider.request({ method: &#x27;eth_chainId&#x27; }),
+    provider.request({ method: &#x27;eth_accounts&#x27; }),
+  ])
+  check()
+  tool_verify_transfer_confirmation(wallet, quote, confirmation)
+  assertQuote(wallet, quote)
+  if (
+    typeof chain !== &#x27;string&#x27; ||
+    BigInt(chain) !== BigInt(wallet.chain_id) ||
+    !Array.isArray(accounts) ||
+    accounts.length !== 1 ||
+    String(accounts[0]).toLowerCase() !== wallet.address.toLowerCase()
+  )
+    throw new WalletError(&#x27;Signing wallet or network changed. Review the transfer again.&#x27;)
+  // After this point an error may mean broadcast succeeded. Never automatically retry.
+  broadcastStarted()
+  const hash = await provider.request({ method: &#x27;eth_sendTransaction&#x27;, params: [quote.transaction] })
+  if (typeof hash !== &#x27;string&#x27; || !/^0x[\da-fA-F]{64}$/.test(hash)) throw new Error(&#x27;Unknown transaction outcome&#x27;)
+  return hash
+}</code></pre><p><code>broadcastStarted()</code> persists continuity through the Journey’s callback. If that write fails, <code>eth_sendTransaction</code> is never called. Once it starts, an exception can mean the effect happened; uncertainty is preserved.</p><p>Logout and isolated storage disposal happen before releasing the origin lock. Failed cleanup activates a reload guard. This prevents a retained SDK session from starting another protected action after its scope ends.</p>
+<h2 id="journey">6. Assemble the Journey</h2><p>The conceptual outcome is <code>journey_send_funds</code>. This implementation is <code>journey_send_transfer</code>. The Surface supplies the reviewed quote, explicit confirmation and current-context callback; it presents results rather than sequencing provider calls.</p><p class="eyebrow">src/usePersonalWallet.ts</p><pre><code>async function confirm() {
+    if (!wallet || !session || !quote || lock.current || reloadRequired || [&#x27;pending&#x27;,&#x27;unknown&#x27;].includes(submission?.status || &#x27;&#x27;)) return
+    lock.current = true; setBusy(true); setError(&#x27;&#x27;)
+    const current = generation.current, requested = quote, key = storageKey
+    try {
+      const result = await journey_send_transfer({ confirmation: createTransferConfirmation(requested), session, wallet, quote: requested, key, storage: localStorage, isCurrent: () =&gt; current === generation.current, send: sendWallet, changed: next =&gt; {</code></pre><p>The Journey creates the operation, acquires its lock and checks for prior work. A replay with the same ID returns the existing result; a different unresolved operation blocks replacement. This excerpt shows how it composes the execution Workflow through <code>send</code> and supplies the durability callback.</p><p class="eyebrow">src/journey/journey_send_transfer.ts</p><pre><code>const hash = await send(
+        session,
+        wallet,
+        quote,
+        isCurrent,
+        () =&gt; {
+          // Durability is required before the effect boundary; failure stops signing.
+          storage.setItem(key, JSON.stringify(operation))
+          started = true
+          changed(operation)
+        },
+        options.confirmation,
+      )
+      if (!/^0x[\da-fA-F]{64}$/.test(hash)) throw new Error(&#x27;Invalid submission evidence&#x27;)
+      operation.hash = hash
+      operation.evidence = [{ kind: &#x27;broadcast-reference&#x27;, reference: hash, observedAt: Date.now() }]
+      const pending: Submission = {
+        ...operation,
+        hash,
+        status: &#x27;pending&#x27;,
+        state: &#x27;pending&#x27;,
+        evidence: [{ kind: &#x27;broadcast-reference&#x27;, reference: hash, observedAt: Date.now() }],
+      }
+      storage.setItem(key, JSON.stringify(pending))
+      changed(pending)
+      return {
+        state: &#x27;pending&#x27;,
+        operationId: operation.operationId!,
+        duty: operation.duty!,
+        evidence: pending.evidence!,
+      }</code></pre><p>The catch branch returns <code>indeterminate</code> after the broadcast boundary. It retains the pre-broadcast record and any known hash. It does not erase the guard or automatically submit a second transaction.</p>
+<h2 id="evidence">7. Establish the outcome</h2><p>A hash is acknowledgment, not completion. <code>workflow_reconcile_transfer</code> calls the observation Capability. That Capability checks the original Recipe/RPC/token/wallet binding, reads the transaction and receipt, then invokes the evidence Tool.</p><p>The Tool checks hash, sender, target, input, value, chain, matching block and receipt status. USDC additionally needs the exact token Transfer event, recipient and units. A valid failed receipt establishes failure; unavailable observations leave the operation unresolved.</p><p class="eyebrow">src/workflow/workflow_reconcile_transfer.ts</p><pre><code>const next: Submission = {
+      ...saved,
+      hash: options.operation.hash,
+      status: result.status,
+      state: result.status === &#x27;confirmed&#x27; ? &#x27;completed&#x27; : &#x27;failed&#x27;,
+      duty: undefined,
+      evidence: [...(saved.evidence ?? []), ...result.evidence],
+    }
+    options.storage.setItem(options.key, JSON.stringify(next))
+    return next
+  })
+}</code></pre><p>Our declared completion contract is <code>transfer-inclusion/v1</code>: matching current inclusion. It does not claim irreversible finality, an Onli-side change or an Oracle update. Those need their own contracts and proof.</p>
+<h2 id="review">8. Review the rules and proof</h2><p>The latest full local check passed <strong>137 tests</strong>, standalone/architecture checks, lint, formatting, TypeScript and production build. Tests prove missing/changed confirmation, wrong identity/network, cleanup scope, persistence-before-effect, lost responses, replay prevention and matching evidence with explicit doubles.</p><p>The audit found and fixed a raw-provider leak: the Capability previously exposed <code>provider()</code> and inferred its interface from the Openfort Adapter. It now exposes the canonical session contract shown above; the regression test rejects raw provider exposure and retained-handle use.</p><div class="table-wrap"><table><thead><tr><th>Rule</th><th>What the code establishes</th></tr></thead><tbody><tr><td>Recipe / provider choice</td><td>Versioned selection outside Workflows; operation bindings retained.</td></tr><tr><td>Reuse and ownership</td><td>Shared recovery/export/send lifecycles; compatibility facades contain no duplicate implementation.</td></tr><tr><td>Capability / Adapter privacy</td><td>SDK and raw provider stay private; Workflows use canonical operations.</td></tr><tr><td>Authority</td><td>Exact user confirmation and signer/network checks; general backend Onli behavior authorization remains an integration gap.</td></tr><tr><td>Evidence / continuity</td><td>Persist before effect, no blind repeat, matching inclusion evidence; hashless ambiguity stays blocked.</td></tr><tr><td>Encryption</td><td>Species authenticated envelope and encrypted backup format; application-level encryption of continuity metadata remains a gap.</td></tr></tbody></table></div><p>This is a locally verified client/proxy architecture, not full production conformance. Backend <code>AuthorizeBehavior</code> enforcement for sends, protected metadata storage, live provider behavior, stronger finality and remote CI remain unverified or incomplete. No live transfer was made. Nine inherited low-severity dependency advisories remain in the pinned SDK tree.</p><p>The repository’s <code>docs/ONLI_CONFORMANCE_REVIEW.md</code> records all applicable gates, evidence and remaining work. See <code>tests/wallet-sdk.test.mjs</code>, <code>tests/contracts/transfer-continuity.test.mjs</code> and <code>tests/architecture/boundaries.test.mjs</code> for the relevant proof.</p><p><a href="index.html#concepts">Return to the concepts and build guide</a></p></main><footer>Openfort implementation walkthrough · 2 October 2026 · Source excerpts from this repository; no live provider effects executed.</footer></body></html>
