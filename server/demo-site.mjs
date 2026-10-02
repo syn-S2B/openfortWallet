@@ -27,6 +27,7 @@ export function createDemoServer(directory = fileURLToPath(new URL('../dist/', i
     if (path === '/api/species/connection') return reply(200, JSON.stringify({ configured: false, gateway_url: '', message: 'Public wallet demo. Real wallet operations are unavailable.' }), 'application/json')
     if (path.startsWith('/api/')) return reply(403, JSON.stringify({ error: { code: 'demo_only', message: 'Real wallet operations are unavailable on this public demo.' } }), 'application/json')
     if (path.includes('\\') || path.includes('\0') || path.split('/').some(part => part.startsWith('.'))) return reply(404, 'Not found')
+    if (path === '/demo' || path === '/demo/') path = '/index.html'
     if (path.endsWith('/')) path += 'index.html'
     const file = resolve(root, `.${path}`)
     if (!file.startsWith(root + sep) || !types[extname(file)]) return reply(404, 'Not found')

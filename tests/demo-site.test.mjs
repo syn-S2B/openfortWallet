@@ -16,6 +16,8 @@ test('public demo serves only built assets and denies all real wallet effects', 
   const base = `http://127.0.0.1:${server.address().port}`
   try {
     assert.match(await (await fetch(base)).text(), /Demo/)
+    assert.match(await (await fetch(`${base}/demo/`)).text(), /Demo/)
+    assert.match(await (await fetch(`${base}/demo`)).text(), /Demo/)
     assert.match(await (await fetch(`${base}/Docs/`)).text(), /Docs/)
     const connection = await fetch(`${base}/api/species/connection`)
     assert.deepEqual(await connection.json(), { configured: false, gateway_url: '', message: 'Public wallet demo. Real wallet operations are unavailable.' })
