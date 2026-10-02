@@ -6,11 +6,9 @@ export default function LandingPage() {
   return (
     <div className="landing">
       <a className="landing-skip" href="#landing-content">Skip to content</a>
-      <header className="landing-nav">
-        <a className="landing-brand" href="/" aria-label="Onli Agentic Wallets home">onli<span> / Agentic Wallets</span></a>
-        <nav aria-label="Main navigation">
-          <a href="/Docs/">Docs</a><a href={github}>GitHub ↗</a><a className="landing-nav-demo" href="/demo/">Open demo</a>
-        </nav>
+      <header className="site-header">
+        <a className="site-brand" href="/" aria-label="Onli Agent Wallets home">onli<span> / Agent Wallets</span></a>
+        <nav aria-label="Main navigation"><a href="/Docs/">Docs</a><a href="/Docs/openfort-walkthrough.html">Code walkthrough</a><a href={github}>GitHub ↗</a><a className="site-demo-link" href="/demo/">Open demo</a></nav>
       </header>
       <main id="landing-content">
         <section className="landing-hero" aria-labelledby="landing-title">
