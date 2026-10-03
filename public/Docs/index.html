@@ -58,18 +58,20 @@ import { workflow_execute_transfer } from &#x27;../workflow/workflow_execute_tra
 import { journey_send_transfer } from &#x27;../journey/journey_send_transfer.ts&#x27;
 import { createTransferConfirmation } from &#x27;../contracts/transfer-confirmation.ts&#x27;
 
-// Step 1: review the request without submitting it.
-const quote = await workflow_review_transfer({
+// Step 1: called by the Review action; returns a quote without submitting.
+async function reviewRequest() {
+  return workflow_review_transfer({
   wallet, asset: &#x27;USDC&#x27;, recipient, amount: &#x27;10&#x27;,
   destination: &#x27;custom&#x27;, storage: localStorage,
   key: operationStorageKey,
   loadIncoming: async () =&gt; &#x27;&#x27;, // unused for a custom destination
   isCurrent: currentSessionAndWalletStillMatch,
-})
-// Show quote to the Owner. A null quote means the context changed.
+  })
+}
+// Show the returned quote. A null quote means the context changed.
 
-// Step 2: inside the explicit Confirm handler, after backend permission checks.
-if (quote) {
+// Step 2: called only by Confirm, after backend permission checks.
+async function confirmReviewedTransfer(quote: NonNullable&lt;Awaited&lt;ReturnType&lt;typeof reviewRequest&gt;&gt;&gt;) {
   const result = await journey_send_transfer({
     session, wallet, quote,
     confirmation: createTransferConfirmation(quote),
@@ -80,7 +82,7 @@ if (quote) {
   })
   showOutcome(result)
 }</code></pre><p>Expected result: review returns a quote or stops with a validation error. Confirmation submits the exact reviewed transaction and returns an operation state. A pending or indeterminate operation needs continued observation; neither is permission to submit again.</p><p>The Journey locks the operation, checks for an existing unresolved intent and persists the operation before broadcast. It never automatically repeats a broadcast after a lost response. Callers display <code>pending</code> or <code>indeterminate</code> honestly and continue observation of that same operation.</p>
-<h2 id="provider-work">What you write as the provider</h2>
+<h2 id="provider-work">If you are adding a wallet provider</h2>
 <p>Your main implementation is the <strong>Adapter</strong>. It translates the agreed Capability operation into your SDK or API and translates the result back. You also supply its versioned Recipe binding and contract tests. You reuse the existing Journey, Workflows and pure Tools wherever their contracts fit.</p>
 <ol><li><strong>Agree the contract.</strong> Define the wallet identity, required permission, supported operations, result states and completion evidence. State any unsupported custody, export or network behavior.</li><li><strong>Write the private Adapter.</strong> Initialize your provider, recover the exact issued account, perform the approved operation and clean up. Translate errors without exposing credentials or raw provider responses.</li><li><strong>Register it through the Capability.</strong> Add the implementation to the Capability’s private Adapter selection. Workflows call the Capability; they never import your SDK.</li><li><strong>Supply a Recipe.</strong> Select the approved Adapter version and permitted network/timing settings. Preserve that binding on each operation.</li><li><strong>Prove it.</strong> Test identity mismatch, missing approval, cancellation, cleanup, lost responses and repeated operation IDs before integrating it into the Journey.</li></ol>
 <p>This is the existing minimal recovery contract. It illustrates what a provider session must return; send and export require their additional contracts.</p><pre><code>type WalletSDK = {
@@ -108,7 +110,7 @@ Resources preserve the wallet, intent, operation and evidence.</code></pre><p>Th
 <p><strong>In transit:</strong> use authenticated, encrypted connections between the client, Onli and your provider. Validate certificates and authenticate the caller. Where the Capability requires an encrypted message envelope, preserve its format and integrity checks; encryption does not replace permission checks.</p>
 <p><strong>At rest:</strong> encrypt sensitive persisted data, including wallet key material, backups, credentials and protected operation data. Keep encryption keys separate from the data, restrict access and define key rotation and recovery. Never persist plaintext private keys or session secrets in browser storage or logs.</p>
 <p>Your Adapter must meet both requirements and document who owns the keys at each boundary. Use the agreed cryptographic formats and tested libraries; do not invent a new encryption scheme.</p>
-<p>In this implementation, the Species proxy uses authenticated AES-256-GCM message envelopes and encrypted backup files use the existing provider-independent format. The proxy permits loopback HTTP for local development; production connections require HTTPS. Browser continuity records contain operation metadata and are currently stored without application-level encryption. They contain no plaintext private keys or session tokens, but encrypted storage for protected metadata and provider-side encryption at rest must be established and verified for a production integration.</p>
+<p>In this implementation, the Species proxy uses authenticated AES-256-GCM message envelopes and encrypted backup files use the existing canonical format. The proxy permits loopback HTTP for local development; production connections require HTTPS. Browser continuity records contain operation metadata and are currently stored without application-level encryption. They contain no plaintext private keys or session tokens, but encrypted storage for protected metadata and provider-side encryption at rest must be established and verified for a production integration.</p>
 <h3>Your deliverables</h3><p>Provide the Adapter, approved Recipe binding, identity/permission mapping, recovery rules, encryption and key-management evidence, and passing contract tests. Include backend requirements and evidence from real provider testing. The reusable send architecture then calls your implementation through the Capability.</p><pre><code>npm ci
 npm run check
 npm run check:security
