@@ -12,7 +12,7 @@ export function createDemoServer(directory = fileURLToPath(new URL('../dist/', i
     res.setHeader('X-Content-Type-Options', 'nosniff')
     res.setHeader('Referrer-Policy', 'no-referrer')
     res.setHeader('X-Frame-Options', 'DENY')
-    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://ethereum-sepolia-rpc.publicnode.com https://eth-sepolia.blockscout.com https://*.openfort.io; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'")
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://ethereum-sepolia-rpc.publicnode.com https://eth-sepolia.blockscout.com https://api.openfort.io https://shield.openfort.io https://embed.openfort.io; frame-src https://embed.openfort.io; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'")
     res.setHeader('Cache-Control', 'no-store')
     const reply = (status, body, type = 'text/plain; charset=utf-8') => {
       res.writeHead(status, { 'Content-Type': type })
