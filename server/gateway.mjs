@@ -53,30 +53,42 @@ async function readJSON(req) {
   try { const value = JSON.parse(Buffer.concat(chunks).toString('utf8')); if (!value || Array.isArray(value) || typeof value !== 'object') throw new Error(); return value }
   catch { refuse(400, 'invalid_json', 'Request must be a JSON object.') }
 }
-export function createMiddleware(config, port = 5175, fetcher = fetch) {
+export function createMiddleware(config, port = 5175, fetcher = fetch, publicOrigin = null) {
+  if (publicOrigin && (!/^https:\/\/[^/]+$/.test(publicOrigin) || new URL(publicOrigin).username || new URL(publicOrigin).password)) throw new Error('An exact HTTPS public origin is required')
   const call = createGateway(config, fetcher)
   return async (req, res, next) => {
     if (!req.url?.startsWith('/api/species')) return next()
     const write = (status, value) => { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }); res.end(JSON.stringify(value)) }
     try {
       const host = req.headers.host
-      if (![`127.0.0.1:${port}`, `localhost:${port}`].includes(host) ||
-          (req.headers.origin && req.headers.origin !== `http://${host}`) || req.headers['sec-fetch-site'] === 'cross-site' ||
-          (req.method === 'POST' && req.headers.origin !== `http://${host}`)) refuse(403, 'origin_refused', 'Use the local wallet application.')
+      const origin = publicOrigin || `http://${host}`
+      const allowedHost = publicOrigin ? host === new URL(publicOrigin).host : [`127.0.0.1:${port}`, `localhost:${port}`].includes(host)
+      if (!allowedHost || (req.headers.origin && req.headers.origin !== origin) || req.headers['sec-fetch-site'] === 'cross-site' ||
+          (req.method === 'POST' && req.headers.origin !== origin)) refuse(403, 'origin_refused', 'Use the wallet application on its configured origin.')
       const path = req.url.slice('/api/species'.length)
+      const upstream = call
+      const testnetCall = async (...args) => {
+        const data = await upstream(...args)
+        if (config.testnetOnly) {
+          const wallet = data?.wallet || data?.member_wallet || (data?.account_ref ? data : null)
+          if (wallet && wallet.chain_id !== 11155111) refuse(409, 'testnet_required', 'This Synth demo supports Sepolia testnet wallets only.')
+          if (args[1] === '/species/v1/money/configuration' && data?.rail_provider?.chain_id !== 11155111) refuse(409, 'testnet_required', 'This Synth demo supports Sepolia treasury wallets only.')
+        }
+        return data
+      }
       if (path === '/connection' && req.method === 'GET') return write(200, { configured: config.configured, gateway_url: config.url, binding_id: config.bindingId, appliance_symbol: config.applianceSymbol,
         message: config.configured ? 'Connected application configuration.' : 'Set the gateway URL and application credentials in your external environment file, then restart the wallet app. See this app’s README.' })
       if (path === '/auth/start' && req.method === 'POST') {
         const body = await readJSON(req)
         const selector = typeof body.email === 'string' ? { email: body.email.trim() } : { onli_id: String(body.onli_id || '').trim() }
         if (!Object.values(selector)[0] || Object.values(selector)[0].length > 254) refuse(400, 'identity_required', 'Enter your Onli email or ID.')
-        const auth = await call('POST', '/species/v1/auth/onli/authentications', '', selector)
+        const auth = await testnetCall('POST', '/species/v1/auth/onli/authentications', '', selector)
         return write(200, { challenge_id: auth.challenge_id, claim_secret: auth.claim_secret, status: auth.status })
       }
       if (path === '/auth/collect' && req.method === 'POST') {
         const body = await readJSON(req)
         if (!/^[a-zA-Z0-9_-]{1,200}$/.test(body.challenge_id) || typeof body.claim_secret !== 'string' || !body.claim_secret || body.claim_secret.length > 500) refuse(400, 'claim_required', 'Start a sign-in first.')
-        const auth = await call('GET', `/species/v1/auth/onli/authentications/${body.challenge_id}`, '', undefined, { 'X-Onli-Auth-Claim': body.claim_secret })
+        const auth = await testnetCall('GET', `/species/v1/auth/onli/authentications/${body.challenge_id}`, '', undefined, { 'X-Onli-Auth-Claim': body.claim_secret })
         const accepted = auth.status === 'ACCEPTED' && auth.session?.token && auth.session?.onli_id
         const journey = accepted ? projectJourney(auth.journey) : undefined
         return write(200, { status: auth.status, ...(accepted ? { session: { token: auth.session.token, onli_id: auth.session.onli_id } } : {}), ...(journey ? { journey } : {}) })
@@ -86,26 +98,26 @@ export function createMiddleware(config, port = 5175, fetcher = fetch) {
       if (path === '/auth/backup-authorization' && req.method === 'POST') {
         const body = await readJSON(req)
         if (Object.keys(body).length !== 1 || !['open-wallet-backup', 'export-treasury-wallet-backup'].includes(body.note?.behavior) || typeof body.note?.body !== 'string' || body.note.body.length > 1024 || Object.keys(body.note).length !== 2) refuse(400, 'invalid_backup_authorization', 'A wallet-file approval note is required.')
-        return write(200, await call('POST', '/species/v1/auth/onli/behavior-authorizations', session, body))
+        return write(200, await testnetCall('POST', '/species/v1/auth/onli/behavior-authorizations', session, body))
       }
       const authorization = /^\/auth\/backup-authorization\/([a-zA-Z0-9_-]{1,200})$/.exec(path)
-      if (authorization && req.method === 'GET') return write(200, await call('GET', `/species/v1/auth/onli/behavior-authorizations/${authorization[1]}`, session))
+      if (authorization && req.method === 'GET') return write(200, await testnetCall('GET', `/species/v1/auth/onli/behavior-authorizations/${authorization[1]}`, session))
       const backup = /^\/members\/(usr-[a-zA-Z0-9_-]+)\/wallet\/backup\/(config|unlock)$/.exec(path)
-      if (backup && backup[2] === 'config' && req.method === 'GET') return write(200, await call('GET', `/species/v1${path}`, session))
+      if (backup && backup[2] === 'config' && req.method === 'GET') return write(200, await testnetCall('GET', `/species/v1${path}`, session))
       if (backup && backup[2] === 'unlock' && req.method === 'POST') {
         const body = await readJSON(req), authLog = req.headers['x-onli-auth-log-id']
         if (typeof authLog !== 'string' || !/^[a-zA-Z0-9_-]{1,200}$/.test(authLog)) refuse(400, 'authorization_required', 'Approve opening this file in OnliYou first.')
-        return write(200, await call('POST', `/species/v1${path}`, session, body, { 'X-Onli-Auth-Log-Id': authLog }))
+        return write(200, await testnetCall('POST', `/species/v1${path}`, session, body, { 'X-Onli-Auth-Log-Id': authLog }))
       }
-      if (path === '/treasury' && req.method === 'GET') return write(200, projectTreasury(await call('GET', '/species/v1/money/configuration', session)))
+      if (path === '/treasury' && req.method === 'GET') return write(200, projectTreasury(await testnetCall('GET', '/species/v1/money/configuration', session)))
       const treasuryBackup = /^\/treasury\/(incoming|master|outgoing)\/wallet\/backup\/(config|download|unlock)$/.exec(path)
       if (treasuryBackup) {
         const upstream = `/species/v1/money${path}`
-        if (treasuryBackup[2] === 'config' && req.method === 'GET') return write(200, await call('GET', upstream, session))
+        if (treasuryBackup[2] === 'config' && req.method === 'GET') return write(200, await testnetCall('GET', upstream, session))
         if (['download', 'unlock'].includes(treasuryBackup[2]) && req.method === 'POST') {
           const body = await readJSON(req), authLog = req.headers['x-onli-auth-log-id']
           if (typeof authLog !== 'string' || !/^[a-zA-Z0-9_-]{1,200}$/.test(authLog)) refuse(400, 'authorization_required', 'Approve this wallet request in OnliYou first.')
-          return write(200, await call('POST', upstream, session, body, { 'X-Onli-Auth-Log-Id': authLog }))
+          return write(200, await testnetCall('POST', upstream, session, body, { 'X-Onli-Auth-Log-Id': authLog }))
         }
       }
       if (path === '/members' && req.method === 'POST') {
@@ -115,16 +127,16 @@ export function createMiddleware(config, port = 5175, fetcher = fetch) {
         const correlationID = req.headers['x-correlation-id']
         if (typeof idempotencyKey !== 'string' || !idempotencyKey || idempotencyKey.length > 200) refuse(400, 'missing_idempotency_key', 'Registration needs a stable Idempotency-Key.')
         if (typeof correlationID !== 'string' || !correlationID || correlationID.length > 200) refuse(400, 'missing_correlation_id', 'Registration needs a stable X-Correlation-Id.')
-        return write(200, await call('POST', '/species/v1/members', session, {}, { 'Idempotency-Key': idempotencyKey, 'X-Correlation-Id': correlationID }))
+        return write(200, await testnetCall('POST', '/species/v1/members', session, {}, { 'Idempotency-Key': idempotencyKey, 'X-Correlation-Id': correlationID }))
       }
       const operation = /^\/operations\/([a-zA-Z0-9_-]{1,200})$/.exec(path)
-      if (operation && req.method === 'GET') return write(200, await call('GET', `/species/v1/operations/${operation[1]}`, session))
+      if (operation && req.method === 'GET') return write(200, await testnetCall('GET', `/species/v1/operations/${operation[1]}`, session))
       const readiness = /^\/members\/(usr-[a-zA-Z0-9_-]+)\/readiness$/.exec(path)
-      if (readiness && req.method === 'GET') return write(200, await call('GET', `/species/v1/members/${readiness[1]}/readiness`, session))
+      if (readiness && req.method === 'GET') return write(200, await testnetCall('GET', `/species/v1/members/${readiness[1]}/readiness`, session))
       const wallet = /^\/members\/(usr-[a-zA-Z0-9_-]+)\/wallet(\/access)?$/.exec(path)
       if (wallet && (req.method === 'POST' || (req.method === 'GET' && !wallet[2]))) {
         if (req.method === 'POST') { const body = await readJSON(req); if (Object.keys(body).length) refuse(400, 'body_not_empty', 'This operation has no input fields.') }
-        return write(200, await call(req.method, `/species/v1${path}`, session, req.method === 'POST' ? {} : undefined))
+        return write(200, await testnetCall(req.method, `/species/v1${path}`, session, req.method === 'POST' ? {} : undefined))
       }
       refuse(404, 'not_found', 'No wallet operation matches this request.')
     } catch (error) {

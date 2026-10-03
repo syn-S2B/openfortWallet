@@ -16,7 +16,7 @@ export default function LandingPage() {
           <h1 id="landing-title">Different from<br />the ground up.</h1>
           <p className="landing-lead">Learn to build a wallet for your Onli Appliance.<br className="landing-desktop-break" /> Follow the Openfort wallet, from intent to outcome.</p>
           <div className="landing-actions"><a className="landing-primary" href="/demo/">Explore the wallet <span aria-hidden="true">↗</span></a><a className="landing-secondary" href="/Docs/">Start learning <span aria-hidden="true">→</span></a></div>
-          <p className="landing-note">Interactive demo · No account required · No real transactions</p>
+          <p className="landing-note">Synth demo · Onli ID required · Sepolia testnet</p>
           <div className="landing-visual" aria-label="A wallet integration connects a digital thing to a proven outcome">
             <div className="landing-object"><span className="landing-object-symbol" aria-hidden="true">o.</span><span>Digital thing</span><small>Identity. Content. Context.</small></div>
             <div className="landing-bridge"><span className="landing-bridge-line" /><span>Wallet adapter</span><small>Selected by Recipe</small></div>

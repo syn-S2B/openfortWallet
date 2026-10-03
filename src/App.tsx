@@ -43,7 +43,7 @@ export default function App() {
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
   const [details, setDetails] = useState('species:master')
-  const [walletOpen, setWalletOpen] = useState(demo)
+  const [walletOpen, setWalletOpen] = useState(false)
   const [backupOpen, setBackupOpen] = useState(false)
   const [connectionOpen, setConnectionOpen] = useState(false)
   const generation = useRef(0), exportLock = useRef(false), openAfterSignIn = useRef(false)
@@ -104,6 +104,16 @@ export default function App() {
         setOnboarding(result.onboarding || null); setSetupStatus('idle')
         generation.current++; openAfterSignIn.current = experience === 'user'
         setSession(result.session); setChallenge(null); setAuthError(''); setAuthBusy(false)
+        if (experience === 'user') {
+          const signedGeneration = generation.current
+          setLoading(true)
+          try {
+            const opened = await journey_open_member_wallet({ session: result.session, registration: registrationArgs.current || undefined, signal: controller.signal, isCurrent: () => generation.current === signedGeneration })
+            if (generation.current === signedGeneration) applyWalletOutcome(opened)
+          } catch (error) {
+            if (generation.current === signedGeneration && !controller.signal.aborted) setWalletError(message(error))
+          } finally { if (generation.current === signedGeneration) setLoading(false) }
+        }
       } else if (result.state === 'failed') { setChallenge(null); setAuthError(result.message) }
     } catch (error) { if (generation.current === current && !controller.signal.aborted) { setChallenge(null); setAuthError(message(error)) } }
     finally { if (generation.current === current && authenticationAbort.current === controller) setAuthBusy(false) }
@@ -177,7 +187,7 @@ export default function App() {
   const login = <section className="login-panel" aria-labelledby="login-title">
     <p className="eyebrow">{experience === 'admin' ? 'Operator access' : 'PLATFORM WALLET'}</p>
     <h2 id="login-title">{experience === 'admin' ? 'Admin login' : 'Sign in with Onli'}</h2>
-    <p>{experience === 'admin' ? 'Use your administrator’s Onli identity to view the treasury accounts.' : 'Approve in Onli. Your wallet opens right here.'}</p>
+    <p>{experience === 'admin' ? 'Use your administrator’s Onli identity to view Incoming, Master and Outgoing.' : 'Accept your Synth invitation, then approve sign-in in OnliYou. Your wallet is set up and opens here.'}</p>{demo && <p><a href="/Docs/onliyou.html">First time? Download OnliYou and join Synth →</a></p>}
     <form onSubmit={signIn}><label>Onli email or ID<input value={onliID} onChange={event => setOnliID(event.target.value)} placeholder="you@example.com or usr-…" required autoComplete="off" disabled={!connection?.configured || authBusy || !!challenge} /></label><button className="primary" disabled={!connection?.configured || authBusy || !!challenge || !onliID.trim()}>{authBusy ? 'Requesting approval…' : challenge ? 'Waiting for Onli…' : 'Sign in with Onli'}</button></form>
     {challenge && <p role="status">Approve the sign-in in Onli. <button className="inline-button" onClick={() => { authenticationAbort.current?.abort(); setChallenge(null); setAuthBusy(false) }}>Cancel</button></p>}
     {authError && <p className="error-message" role="alert">{authError}</p>}
@@ -185,10 +195,10 @@ export default function App() {
     {experience === 'user' && <button className="preview-button" data-wallet-opener onClick={() => setWalletOpen(true)}>Preview wallet UI ↗</button>}
   </section>
   return <main className={`test-platform experience-${experience}`}>
-    <header className="platform-toolbar"><div><span className="platform-brand">SPECIES</span><span className="platform-caption">{demo ? 'Wallet UI demo · no account connected' : 'Experience test platform'}</span></div><a className="site-docs-link" href="/Docs/index.html">Docs</a><a className="site-docs-link" href="https://github.com/syn-S2B/openfortWallet">GitHub</a><nav className="experience-switch" aria-label="Experience"><button aria-pressed={experience === 'user'} onClick={() => changeExperience('user')}>User experience</button><button aria-pressed={experience === 'admin'} onClick={() => changeExperience('admin')}>Admin experience</button></nav><button className="connection-button" onClick={() => setConnectionOpen(true)}>{connection?.configured ? 'Instance connected' : 'Connect instance'} <span aria-hidden="true">↗</span></button></header>
+    <header className="platform-toolbar"><div><span className="platform-brand">{demo ? 'SYNTH' : 'SPECIES'}</span><span className="platform-caption">{demo ? 'Synth · Sepolia testnet' : 'Experience test platform'}</span></div><a className="site-docs-link" href="/Docs/index.html">Docs</a><a className="site-docs-link" href="https://github.com/syn-S2B/openfortWallet">GitHub</a><nav className="experience-switch" aria-label="Experience"><button aria-pressed={experience === 'user'} onClick={() => changeExperience('user')}>User experience</button><button aria-pressed={experience === 'admin'} onClick={() => changeExperience('admin')}>Admin experience</button></nav><button className="connection-button" onClick={() => setConnectionOpen(true)}>{connection?.configured ? 'Instance connected' : 'Connect instance'} <span aria-hidden="true">↗</span></button></header>
     <div className="experience-stage">
       {experience === 'user' ? <section className="user-shell">
-        <header className="user-header"><span className="platform-brand">SPECIES</span>{session && <button className="chip" onClick={disconnect}>Sign out</button>}</header>
+        <header className="user-header"><span className="platform-brand">{demo ? 'SYNTH' : 'SPECIES'}</span>{session && <button className="chip" onClick={disconnect}>Sign out</button>}</header>
         <div className="user-content"><div className="user-intro"><p className="eyebrow">The user experience</p><h1>Your wallet.<br />Your world.</h1><p>One Onli sign-in. A platform wallet that stays with you.</p><span className="user-intro-note">{connection?.configured && connection.appliance_symbol ? `Appliance · ${connection.appliance_symbol}` : 'Appliance not configured'}</span></div>
           {!session ? login : <section className="login-panel"><p className="eyebrow">Signed in with Onli</p><h2>PLATFORM WALLET</h2><p className="identity-line">{session.onli_id}</p>{loading ? <p role="status">Opening your wallet…</p> : wallet ? <><p>{wallet.network}</p><button className="primary" data-wallet-opener onClick={() => setWalletOpen(true)}>Open wallet ↗</button><button className="preview-button" onClick={() => void refresh()}>Refresh wallet</button></> : <><p role="status">{walletError || 'Your wallet is not available yet.'}</p>{registrationVisible ? <><button className="primary" disabled={busy} onClick={() => void setupMember()}>{setupStatus === 'working' ? 'Setting up…' : setupStatus === 'error' ? 'Retry setup' : 'Set up my wallet'}</button>{setupStatus === 'working' && <button className="inline-button" onClick={cancelSetup}>Cancel setup</button>}</> : ['member_wallet_required', 'member_wallet_pending'].includes(walletCode) && <button className="primary" disabled={busy} onClick={() => void ensureWallet()}>{busy ? 'Checking Species…' : walletCode === 'member_wallet_pending' ? 'Reconcile wallet' : 'Set up my wallet'}</button>}</>}</section>}
         </div>

@@ -26,7 +26,7 @@ export default function WalletDemo() {
   }
   return <main className="wallet-demo-page">
     <header className="wallet-demo-header"><a href="/">← Onli Agentic Wallets</a><a href="/Docs/openfort-walkthrough.html">How this wallet is built →</a></header>
-    <section className="wallet-demo-intro"><p className="eyebrow">INTERACTIVE WALLET DEMO</p><h1>Try the wallet. No login needed.</h1><p>Explore a sample wallet and practice reviewing a send. Everything here is simulated; balances, recipients and activity are fictional.</p></section>
+    <section className="wallet-demo-intro"><p className="eyebrow">INTERACTIVE WALLET DEMO</p><h1>Wallet interface simulation.</h1><p>Explore a sample wallet and practice reviewing a send. This is a simulation, not the connected Synth testnet wallet.</p><p><a href="/Docs/onliyou.html">Get OnliYou and learn the Synth onboarding steps →</a></p></section>
     <section className="wallet-demo-card" aria-label="Sample wallet">
       <div className="wallet-demo-card-top"><strong>Appliance wallet</strong><span>SIMULATION</span></div>
       <nav aria-label="Wallet views">{(['home', 'receive', 'send', 'activity'] as const).map(item => <button key={item} aria-current={view === item || (item === 'send' && view === 'review') ? 'page' : undefined} onClick={() => {setView(item); setError(''); setNotice('')}}>{item === 'home' ? 'Overview' : item[0].toUpperCase() + item.slice(1)}</button>)}</nav>

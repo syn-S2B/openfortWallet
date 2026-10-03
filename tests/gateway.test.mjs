@@ -182,3 +182,26 @@ test('wallet approval proxy refuses unrelated behavior names and client-supplied
   }
  })
 })
+
+test('hosted gateway accepts only its exact HTTPS host and origin', async () => {
+  const origin = 'https://wallet.example.test'
+  const middleware = createMiddleware(config, 8080, async () => { throw new Error('Unexpected upstream call') }, origin)
+  async function request(headers) {
+    let status, body
+    await middleware({ url: '/api/species/connection', method: 'GET', headers }, { writeHead(code) {status=code}, end(value) {body=JSON.parse(value)} }, () => assert.fail('Unexpected next'))
+    return {status,body}
+  }
+  assert.equal((await request({host:'wallet.example.test',origin})).status,200)
+  assert.equal((await request({host:'other.example.test',origin})).status,403)
+  assert.equal((await request({host:'wallet.example.test',origin:'https://other.example.test'})).status,403)
+  assert.equal((await request({host:'wallet.example.test','sec-fetch-site':'cross-site'})).status,403)
+  assert.throws(() => createMiddleware(config,8080,fetch,'http://wallet.example.test'))
+})
+
+test('public testnet gateway refuses mainnet wallet projection', async () => {
+  const path='/species/v1/members/usr-fixture/wallet'
+  const middleware=createMiddleware({...config,testnetOnly:true},8080,async () => response({ok:true,data:{account_ref:'fixture',chain_id:1}},'GET',path),'https://wallet.example.test')
+  let status,body
+  await middleware({url:'/api/species/members/usr-fixture/wallet',method:'GET',headers:{host:'wallet.example.test','x-onli-session':'fixture'}},{writeHead(code){status=code},end(value){body=JSON.parse(value)}},()=>assert.fail('Unexpected next'))
+  assert.equal(status,409); assert.equal(body.error.code,'testnet_required')
+})
